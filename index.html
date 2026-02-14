@@ -4,7 +4,179 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Wasteland Survivor</title>
-<style>
+</* ═══════════════════════════════════════════════════════════
+   WASTELAND SURVIVOR — config.js
+   All game data. Add items/enemies/recipes here.
+   ═══════════════════════════════════════════════════════════ */
+
+const C = {
+w: 60, h: 60,
+
+/* ── World Tiles ─────────────────────────────────────────── */
+tiles: {
+  grass:   {ch:',', css:'t-grass',  pass:true,  cap:2, name:"Wild Grass",    desc:"Overgrown vegetation.", placeable:true},
+  forest:  {ch:'🌲',css:'t-forest', pass:true,  cap:4, name:"Deep Woods",    desc:"Dense trees. Good cover.", placeable:true},
+  water:   {ch:'≈', css:'t-water',  pass:false, cap:0, name:"Deep Water",    desc:"Impassable."},
+  road:    {ch:'·', css:'t-road',   pass:true,  cap:2, name:"Old Road",      desc:"Cracked asphalt.", placeable:true},
+  bridge:  {ch:'=', css:'t-bridge', pass:true,  cap:0, name:"Bridge",        desc:"Safe crossing."},
+  house:   {ch:'🏠',css:'t-house',  pass:true,  cap:3, name:"Ruined House",  desc:"Enterable. Search inside."},
+  store:   {ch:'🏪',css:'t-store',  pass:true,  cap:5, name:"Grocery Store", desc:"Rich pickings inside."},
+  camp:    {ch:'⛺',css:'t-camp',   pass:true,  cap:0, name:"Base Camp",     desc:"Your starting camp."},
+  bedroll: {ch:'🛌',css:'t-bedroll',pass:true,  cap:0, name:"Bedroll",       desc:"A rough sleeping spot. Better than bare ground."},
+  shelter: {ch:'🏕️',css:'t-shelter',pass:true,  cap:0, name:"Lean-To",       desc:"A sturdy shelter. Almost feels like home."},
+},
+
+/* ── Interior Tile Types ─────────────────────────────────── */
+itiles: {
+  wall:   {ch:'▓', css:'it-wall',   pass:false},
+  floor:  {ch:'·', css:'it-floor',  pass:true},
+  door:   {ch:'╬', css:'it-door',   pass:true, entry:true, barricadable:true},
+  window: {ch:'▢', css:'it-window', pass:true, entry:true, barricadable:true},
+  shelf:  {ch:'📦',css:'it-shelf',  pass:false, searchable:true},
+  counter:{ch:'🔲',css:'it-counter',pass:false, searchable:true},
+},
+
+/* ── Skills ──────────────────────────────────────────────── */
+skills: {
+  survival:  {name:"Survival",  start:true,  desc:"scavenging & searching"},
+  combat:    {name:"Combat",    start:true,  desc:"damage dealt in fights"},
+  carpentry: {name:"Carpentry", start:false, desc:"barricading & crafting"},
+},
+
+/* ── Items ────────────────────────────────────────────────── */
+items: {
+  knife:       {name:"Shiv",           type:'weapon',icon:'🔪',stat:'atk',val:3, wgt:0.5,dur:40},
+  bat:         {name:"Nail Bat",       type:'weapon',icon:'🏏',stat:'atk',val:5, wgt:2.0,dur:60},
+  rifle:       {name:"Old Rifle",      type:'weapon',icon:'🔫',stat:'atk',val:10,wgt:4.0,dur:25},
+  flashlight:  {name:"Flashlight",     type:'tool',  icon:'🔦',stat:'vis',val:2, wgt:0.5,dur:80},
+  hammer:      {name:"Hammer",         type:'tool',  icon:'🔨',stat:'vis',val:0, wgt:1.0,dur:100},
+  boots:       {name:"Work Boots",     type:'feet',  icon:'🥾',stat:'mov',val:1, wgt:1.0,dur:200},
+  jacket:      {name:"Leather Jacket", type:'body',  icon:'🧥',stat:'def',val:5, wgt:2.0,dur:80},
+  backpack:    {name:"Hiking Pack",    type:'back',  icon:'🎒',stat:'cap',val:20,wgt:1.0},
+  canned:      {name:"Canned Beans",   type:'use',   icon:'🥫',effect:'food', val:25,wgt:0.5,stack:10},
+  jerky:       {name:"Dried Jerky",    type:'use',   icon:'🥩',effect:'food', val:15,wgt:0.2,stack:10},
+  water_b:     {name:"Water Bottle",   type:'use',   icon:'💧',effect:'water',val:25,wgt:0.5,stack:10},
+  bandage:     {name:"Bandage",        type:'use',   icon:'🩹',effect:'heal', val:20,wgt:0.1,stack:5},
+  book_carp:   {name:"Carpentry Vol.1",type:'read',  icon:'📘',skill:'carpentry',xp:50,wgt:0.5},
+  scrap:       {name:"Scrap Metal",    type:'mat',   icon:'⚙️',wgt:0.2,stack:50},
+  wood:        {name:"Plank",          type:'mat',   icon:'🪵',wgt:1.0,stack:10},
+  nails:       {name:"Box of Nails",   type:'mat',   icon:'🔩',wgt:0.1,stack:100},
+  cloth:       {name:"Cloth Strip",    type:'mat',   icon:'🧵',wgt:0.1,stack:20},
+  bedroll_kit: {name:"Bedroll Kit",    type:'place', icon:'🛌',placeType:'bedroll',wgt:1.5},
+  shelter_kit: {name:"Lean-To Kit",    type:'place', icon:'🏕️',placeType:'shelter',wgt:3.0},
+},
+
+/* ── Enemies — add new types here + in zombieSpawns ──────── */
+enemies: {
+  shambler:{name:"Shambler",icon:'🧟',hp:12,atk:4, def:0,xp:15,speed:4},
+  runner:  {name:"Runner",  icon:'💀',hp:8, atk:6, def:0,xp:25,speed:2},
+  brute:   {name:"Brute",   icon:'👹',hp:30,atk:10,def:3,xp:50,speed:5},
+},
+zombieSpawns: [
+  {id:'shambler',weight:10},
+  {id:'runner',  weight:2},
+  {id:'brute',   weight:1},
+],
+
+/* ── Recipes ─────────────────────────────────────────────── */
+recipes: {
+  nail_bat:    {name:"Nail Bat",    reqSkill:null,            inputs:{wood:1,nails:6},         result:{type:'item',id:'bat',count:1}},
+  bandage_c:   {name:"Bandage",     reqSkill:null,            inputs:{cloth:2},                result:{type:'item',id:'bandage',count:1}},
+  bedroll_c:   {name:"Bedroll Kit", reqSkill:null,            inputs:{cloth:5},                result:{type:'item',id:'bedroll_kit',count:1}},
+  shelter_c:   {name:"Lean-To Kit", reqSkill:['carpentry',1], inputs:{wood:3,cloth:3,nails:4}, result:{type:'item',id:'shelter_kit',count:1}},
+  barricade:   {name:"Barricade",   reqSkill:['carpentry',1], inputs:{wood:1,nails:3},         result:{type:'barricade'}},
+},
+
+/* ── Rest Tiers (progression: rough → bedroll → shelter → camp/home) ─ */
+restTiers: {
+  rough:   {stm:50,  hp:0,  food:10, water:10, ticks:5, label:"Rough Rest",
+            msg:["Slept fitfully on the cold ground.", "Dozed off against a tree. Every sound jolts you awake.", "Barely slept. Your back aches something fierce."]},
+  bedroll: {stm:80,  hp:10, food:7,  water:7,  ticks:3, label:"Bedroll",
+            msg:["The bedroll keeps the worst of the cold out.", "Managed some real sleep for once.", "Not luxury, but the bedroll helps."]},
+  shelter: {stm:100, hp:20, food:5,  water:5,  ticks:3, label:"Lean-To",
+            msg:["Sheltered from the wind. Slept well.", "The lean-to kept you hidden and warm.", "Proper rest under cover. Feeling strong."]},
+  camp:    {stm:100, hp:15, food:5,  water:5,  ticks:3, label:"Camp",
+            msg:["Rested at camp. Familiar ground.", "Home base. You sleep soundly.", "Camp rest. Ready to move."]},
+  home:    {stm:100, hp:25, food:5,  water:5,  ticks:3, label:"Home",
+            msg:["Slept behind barricaded walls. Wounds healing.", "The closest thing to safety out here.", "A full rest in your claimed home. Refreshed."]},
+},
+
+/* ── Loot Pools ──────────────────────────────────────────── */
+lootPools: {
+  nature:     [{id:'wood',weight:15},{id:'cloth',weight:4},{id:'book_carp',weight:1}],
+  road:       [{id:'scrap',weight:10},{id:'water_b',weight:5},{id:'nails',weight:8},{id:'knife',weight:2}],
+  house:      [{id:'canned',weight:8},{id:'water_b',weight:8},{id:'bandage',weight:5},{id:'nails',weight:8},{id:'book_carp',weight:2},{id:'knife',weight:3},{id:'cloth',weight:6}],
+  store:      [{id:'canned',weight:15},{id:'water_b',weight:12},{id:'bandage',weight:6},{id:'backpack',weight:2},{id:'boots',weight:2},{id:'flashlight',weight:3},{id:'jerky',weight:8}],
+  shelf_house:[{id:'canned',weight:10},{id:'water_b',weight:10},{id:'bandage',weight:8},{id:'cloth',weight:8},{id:'nails',weight:10},{id:'hammer',weight:3},{id:'knife',weight:4},{id:'jacket',weight:2},{id:'book_carp',weight:3}],
+  shelf_store:[{id:'canned',weight:15},{id:'water_b',weight:15},{id:'bandage',weight:10},{id:'jerky',weight:10},{id:'backpack',weight:3},{id:'flashlight',weight:5},{id:'boots',weight:3},{id:'rifle',weight:1}],
+},
+tileLoot: {grass:'nature', forest:'nature', road:'road', house:'house', store:'store'},
+
+/* ── Interior Layouts (# wall, . floor, D door, W window, S shelf) ── */
+layouts: {
+  house: [
+    ["#######","#S...S#","#.....#","##.D.##","#S...S#","#.....#","#W#.#W#"],
+    ["#######","#S....#","#.....#","#..####","#S..S.#","#.....#","#W#D#W#"],
+    ["#######","#.S.S.#","#.....#","#.....#","#.....#","#S...S#","##WDW##"],
+  ],
+  store: [
+    ["#########","#.S.S.S.#","#.......#","#.S.S.S.#","#.......#","#.......#","####D####"],
+    ["#########","#S.....S#","#.......#","#.S.S.S.#","#.......#","#S.....S#","####D####"],
+  ],
+},
+
+startItems: ['canned','canned','water_b','water_b','knife','bandage','bandage','hammer','nails','wood','wood','book_carp'],
+
+player: {hp:100, stm:100, food:80, h2o:80, maxWeight:15},
+
+/* ── Tuning Constants ────────────────────────────────────── */
+tuning: {
+  // Vision & Movement
+  baseVision:     3,
+  nightVisPen:    1,
+  moveCost:       2,
+  encumberedStamPen: 2,
+
+  // Resource Costs
+  scavengeCost:   8,
+  searchCost:     5,
+  scavengeChance: 0.45,
+
+  // Survival Drain
+  tickHunger:     0.25,
+  tickThirst:     0.4,
+  starveDmg:      1,
+
+  // Combat
+  baseDmg:        1,
+  combatSkillBonus: 0.5,
+  durWeapon:      1,
+  durArmor:       1,
+  durTool:        1,
+
+  // Day/Night Cycle
+  turnsPerDay:    24,
+  nightRatio:     0.35,
+
+  // Zombie Spawning & AI
+  initZombies:    4,
+  zombiesPerNight:2,
+  zombieEsc:      0.3,     // extra zombies per day
+  maxZombies:     20,
+  zombieAggro:    5,       // tiles before zombie chases
+  zombieSpawnBuf: 10,      // min distance from player to spawn
+
+  // Building Interiors
+  interiorZombieChance: 0.25,
+  barricadeHp:    50,
+},
+
+worldGen: {
+  cityCount:6, cityMinEdgeBuffer:5, cityCoreDist:2,
+  citySuburbDist:5, citySuburbChance:0.4, storeChance:0.3,
+  terrainWaterThreshold:1.8, terrainForestThreshold:1.2,
+},
+};>
 /* ═══════════════════════════════════════════════════════════
    VARIABLES & RESET
    ═══════════════════════════════════════════════════════════ */
@@ -37,6 +209,7 @@ display:flex;justify-content:space-between;align-items:center;height:38px;flex-s
 .tag-d{background:#3a1010;color:#f85149;border:1px solid var(--danger);animation:pf 1.5s infinite}
 .tag-in{background:#1a2a10;color:#7cc832;border:1px solid #4a8020;font-size:10px}
 .tag-c{background:#2a1a10;color:#d29922;border:1px solid #aa7722}
+.tag-camp{background:#1a1a10;color:#c8a832;border:1px solid #8a7020;font-size:10px}
 
 /* ═══ LOG ═══ */
 .lc{flex:1;display:flex;flex-direction:column;background:#080808;min-width:140px}
@@ -74,6 +247,8 @@ display:flex;justify-content:space-between;align-items:center;height:38px;flex-s
 .t-store{background:#263238;color:#90a4ae;border:1px solid #455a64}
 .t-camp{background:#2e221b;border:2px solid var(--accent)}
 .t-claimed{background:#2e2a1b;border:2px solid #7cc832}
+.t-bedroll{background:#2a2520;color:#a89070;border:1px solid #6b5540;box-shadow:inset 0 0 6px rgba(168,144,112,.15)}
+.t-shelter{background:#2a2e1b;color:#8aaa60;border:2px solid #5a7830;box-shadow:inset 0 0 6px rgba(138,170,96,.15)}
 .t-dep{opacity:.45;filter:grayscale(1)}.t-mem{opacity:.35;filter:grayscale(.8)}
 .t-zomb{box-shadow:inset 0 0 8px rgba(218,54,51,.4)}
 .zi{position:absolute;z-index:8;filter:drop-shadow(0 0 3px rgba(200,0,0,.6));animation:zs 2s ease-in-out infinite}
@@ -94,9 +269,27 @@ display:flex;justify-content:space-between;align-items:center;height:38px;flex-s
 .btn-s{padding:8px;font-size:11px;color:#888}
 .btn-fight{background:#2a1515!important;border-color:#8b3030!important;color:#ff7b72!important}
 .btn-fight:active{background:#3a2020!important}
+
+/* ── Rest Buttons (tiered styling) ── */
+.btn-rest-rough{background:#1a1a18!important;border-color:#3a3520!important;color:#999!important}
+.btn-rest-bedroll{background:#1f1d18!important;border-color:#5a4830!important;color:#c8a050!important}
+.btn-rest-shelter{background:#1a2018!important;border-color:#4a6830!important;color:#8aaa60!important}
+.btn-rest-camp{background:#201c18!important;border-color:#8b6a20!important;color:#d29922!important}
+.btn-rest-home{background:#1a2a10!important;border-color:#4a8020!important;color:#7cc832!important}
+.rest-qual{display:inline-flex;gap:2px;margin-left:6px;vertical-align:middle}
+.rest-dot{width:6px;height:6px;border-radius:50%;background:#2a2a2a;border:1px solid #444;display:inline-block}
+.rest-dot-on{background:#d29922;border-color:#e8b830}
+.btn-rest-home .rest-dot-on{background:#7cc832;border-color:#90e040}
+.btn-rest-shelter .rest-dot-on{background:#8aaa60;border-color:#a0c070}
+.rest-cost{color:#666;font-weight:normal;margin-left:6px}
+
+/* ── Placement Buttons ── */
+.btn-place{background:#1a1d20!important;border-color:#3a5040!important;color:#8ab890!important}
+.btn-place:hover:not(:disabled){background:#2a3530!important;border-color:#5a7a60!important}
+
 .ib{cursor:pointer;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:3px;font-family:inherit;font-size:10px;padding:4px 8px;margin-left:3px;color:#999}
 .ib:hover{background:#2a2a2a;border-color:#444}.ib:active{transform:scale(.95)}
-.ib-u{color:#3498db}.ib-d{color:#666}
+.ib-u{color:#3498db}.ib-d{color:#666}.ib-p{color:#8ab890}
 .inv-w{font-size:11px;color:#555;text-align:right;margin-bottom:6px}.w-h{color:var(--danger);font-weight:bold}
 .ii,.eq{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#111;border:1px solid #252525;margin-bottom:4px;border-radius:4px;font-size:12px}
 .bs{font-size:9px;background:#2a2a2a;padding:2px 5px;border-radius:3px;color:#999;margin-left:4px}
@@ -116,149 +309,4 @@ display:flex;justify-content:space-between;align-items:center;height:38px;flex-s
 /* ═══ DEATH SCREEN — hidden by default ═══ */
 .ds{position:fixed;inset:0;background:rgba(0,0,0,0);display:flex;align-items:center;justify-content:center;z-index:1000;pointer-events:none;opacity:0;transition:opacity 1.2s,background 1.5s}
 .ds.on{pointer-events:all;opacity:1;background:rgba(10,0,0,.92)}
-.dc{text-align:center;animation:df 1.5s ease forwards}
-.d-sk{font-size:64px;filter:drop-shadow(0 0 30px rgba(200,0,0,.4));animation:dp 3s ease-in-out infinite}
-.d-t{font-size:26px;font-weight:bold;color:var(--danger);letter-spacing:6px;margin:16px 0 24px;text-shadow:0 0 20px rgba(218,54,51,.3)}
-.d-s{color:#666;font-size:13px;display:flex;flex-direction:column;gap:8px;margin-bottom:30px}
-.d-s strong{color:#aaa}
-.d-b{background:#2a1010!important;border-color:var(--danger)!important;color:#f85149!important;width:auto!important;padding:14px 40px!important;font-size:14px!important;display:inline-flex!important;justify-content:center!important;letter-spacing:2px}
-
-/* ═══ ANIMATIONS ═══ */
-@keyframes pf{0%,100%{opacity:1}50%{opacity:.6}}
-@keyframes zs{0%,100%{transform:translateX(0)}25%{transform:translateX(-1px)}75%{transform:translateX(1px)}}
-@keyframes df{0%{transform:scale(.8);opacity:0}100%{transform:scale(1);opacity:1}}
-@keyframes dp{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-
-/* ═══ MOBILE ═══ */
-@media(max-width:600px){
-.main{flex-direction:column}
-.mc{width:100%;height:45vh;border-right:none;border-bottom:1px solid var(--border);max-width:none}
-.lc{flex:1;min-height:0}.bb{height:240px}.pr{width:135px;padding:8px}
-.mp .btn{padding:12px}.sg{gap:6px;font-size:11px}
-}
-@media(max-height:700px){.bb{height:220px}}
-</style>
-</head>
-<body>
-
-<div class="app">
-  <div class="header">
-    <div class="sg">
-      <span class="s-hp">♥ <span id="vHp">--</span></span>
-      <span class="s-stm">⚡ <span id="vStm">--</span></span>
-    </div>
-    <div class="sg">
-      <span class="s-h2o">💧 <span id="vH2o">--</span></span>
-      <span class="s-food">🍖 <span id="vFood">--</span></span>
-    </div>
-    <div class="day-d">
-      <span id="vDay" class="t-day">Day 1</span>
-      <span id="vTime" style="font-size:9px;color:#666">Morning</span>
-    </div>
-  </div>
-
-  <div class="main">
-    <div class="mc">
-      <div class="vp" id="viewport">
-        <div id="mapC"></div>
-        <div id="locOv" class="loc-ov">...</div>
-        <div id="moodles" class="moo"></div>
-        <div id="nightOv" class="night-ov"></div>
-      </div>
-      <div class="insp">
-        <div class="insp-i" id="iIcon">?</div>
-        <div style="min-width:0;flex:1">
-          <div id="iName" style="font-weight:bold;color:#fff;font-size:12px">Unknown</div>
-          <div id="iDesc" style="color:#888;font-size:10px">--</div>
-        </div>
-        <div id="iTags" style="margin-left:auto;white-space:nowrap;display:flex;gap:4px"></div>
-      </div>
-    </div>
-    <div class="lc">
-      <div class="lh">SURVIVAL LOG</div>
-      <div id="gameLog" class="ll"></div>
-    </div>
-  </div>
-
-  <div class="bb">
-    <div class="pl">
-      <div class="tabs">
-        <button class="tb on" data-tab="act" onclick="G.setTab('act')">ACTIONS</button>
-        <button class="tb" data-tab="inv" onclick="G.setTab('inv')">INV</button>
-        <button class="tb" data-tab="craft" onclick="G.setTab('craft')">CRAFT</button>
-        <button class="tb" data-tab="char" onclick="G.setTab('char')">STATUS</button>
-      </div>
-      <div id="tab-act" class="tc on"><div id="actList" class="ag"></div></div>
-      <div id="tab-inv" class="tc"><div id="invList"></div></div>
-      <div id="tab-craft" class="tc"><div id="craftList"></div></div>
-      <div id="tab-char" class="tc">
-        <div class="cs">
-          <span>👁 <strong id="sVis">0</strong></span>
-          <span>⚔️ <strong id="sAtk">0</strong></span>
-          <span>🛡️ <strong id="sDef">0</strong></span>
-          <span>🥾 <strong id="sMov">0</strong></span>
-          <span>💀 <strong id="sKills">0</strong></span>
-        </div>
-        <div id="equipList"></div>
-      </div>
-    </div>
-    <div class="pr">
-      <div class="mp">
-        <div></div>
-        <button class="btn" onclick="G.move(0,-1)">▲</button>
-        <div></div>
-        <button class="btn" onclick="G.move(-1,0)">◄</button>
-        <div class="cc">🧭</div>
-        <button class="btn" onclick="G.move(1,0)">►</button>
-        <div></div>
-        <button class="btn" onclick="G.move(0,1)">▼</button>
-        <div></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Death Screen -->
-<div id="deathScr" class="ds">
-  <div class="dc">
-    <div class="d-sk">💀</div>
-    <div class="d-t">YOU DIED</div>
-    <div class="d-s">
-      <div>Survived <strong id="dDays">0</strong> days</div>
-      <div>Killed <strong id="dKills">0</strong> zombies</div>
-      <div><strong id="dTurns">0</strong> actions taken</div>
-    </div>
-    <button class="btn d-b" onclick="G.restart()">TRY AGAIN</button>
-  </div>
-</div>
-
-<!-- Load order: config → world → ui → game -->
-<script src="./config.js"></script>
-<script src="./world.js"></script>
-<script src="./ui.js"></script>
-<script src="./game.js"></script>
-<script>
-// Init with diagnostics — shows exactly which file failed to load
-window.onload = function() {
-  var missing = [];
-  if (typeof C === 'undefined') missing.push('config.js');
-  if (typeof World === 'undefined') missing.push('world.js');
-  if (typeof UI === 'undefined') missing.push('ui.js');
-  if (typeof Game === 'undefined') missing.push('game.js');
-  if (missing.length) {
-    document.getElementById('gameLog').innerHTML =
-      '<div class="le l-bad">Failed to load: ' + missing.join(', ') + '</div>' +
-      '<div class="le l-bad">Make sure all .js files are in the same folder as index.html</div>';
-    return;
-  }
-  try { G = new Game(); }
-  catch(e) {
-    document.getElementById('gameLog').innerHTML =
-      '<div class="le l-bad">Init error: ' + e.message + '</div>' +
-      '<div class="le" style="color:#666;font-size:10px">' + e.stack + '</div>';
-  }
-};
-</script>
-
-</body>
-</html>
+.dc{text-align:center;animation:df 1.
