@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Wasteland Survivor</title>
+<style>
+/* ═══════════════════════════════════════════════════════════
+   VARIABLES & RESET
+   ═══════════════════════════════════════════════════════════ */
+:root{--bg:#0d1117;--panel:#161b22;--border:#30363d;--accent:#d29922;
+--text:#c9d1d9;--danger:#da3633;--warn:#d29922;--good:#238636;--tile:36px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Courier New',monospace;background:var(--bg);color:var(--text);
+font-size:13px;height:100vh;height:100dvh;display:flex;flex-direction:column;
+overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.app{max-width:1000px;margin:0 auto;width:100%;height:100%;display:flex;flex-direction:column}
+
+/* ═══ HEADER ═══ */
+.header{padding:6px 10px;background:#000;border-bottom:1px solid var(--border);
+display:flex;justify-content:space-between;align-items:center;height:38px;flex-shrink:0}
+.sg{display:flex;gap:10px;font-weight:bold;font-size:12px}
+.s-hp{color:#ff7b72}.s-stm{color:#e2e210}.s-h2o{color:#79c0ff}.s-food{color:#d2a8ff}
+.day-d{display:flex;flex-direction:column;align-items:flex-end;line-height:1.2}
+.t-day{color:#e2c55a;font-weight:bold;font-size:11px}
+.t-night{color:#6e7681;font-weight:bold;font-size:11px}
+
+/* ═══ MAIN STAGE ═══ */
+.main{flex:1;display:flex;overflow:hidden;min-height:0}
+.mc{flex:0 0 auto;display:flex;flex-direction:column;border-right:1px solid var(--border);width:65vmin;max-width:500px}
+.vp{flex:1;background:#000;display:flex;justify-content:center;align-items:center;position:relative;overflow:hidden}
+.night-ov{position:absolute;inset:0;background:rgba(5,10,30,0.45);pointer-events:none;z-index:40;opacity:0;transition:opacity 0.8s}.night-ov.on{opacity:1}
+.insp{height:44px;background:#111;border-top:1px solid var(--border);padding:5px 10px;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.insp-i{font-size:18px;width:30px;height:30px;background:#1a1a1a;border:1px solid #333;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tag{font-size:9px;font-weight:bold;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px}
+.tag-l{background:#0d3040;color:#3498db;border:1px solid #2980b9}
+.tag-d{background:#3a1010;color:#f85149;border:1px solid var(--danger);animation:pf 1.5s infinite}
+.tag-in{background:#1a2a10;color:#7cc832;border:1px solid #4a8020;font-size:10px}
+.tag-c{background:#2a1a10;color:#d29922;border:1px solid #aa7722}
+
+/* ═══ LOG ═══ */
+.lc{flex:1;display:flex;flex-direction:column;background:#080808;min-width:140px}
+.lh{padding:4px 8px;font-size:10px;color:#555;border-bottom:1px solid #1a1a1a;background:#0d0d0d;letter-spacing:1px}
+.ll{flex:1;overflow-y:auto;padding:8px;font-size:11px}
+.le{margin-bottom:5px;padding-left:8px;border-left:2px solid transparent;color:#555;line-height:1.3}
+.l-good{color:#3fb950;border-left-color:#3fb950}.l-bad{color:#f85149;border-left-color:#f85149}
+.l-imp{color:var(--accent);border-left-color:var(--accent)}.l-combat{color:#ff9f43;border-left-color:#ff9f43}
+
+/* ═══ MOODLES ═══ */
+.moo{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;align-items:flex-end;gap:3px;pointer-events:none;z-index:50}
+.mo{background:rgba(0,0,0,.85);border:1px solid #444;padding:3px 7px;border-radius:3px;font-weight:bold;font-size:10px}
+.m-w{color:var(--warn);border-color:var(--warn)}.m-b{color:#f85149;border-color:#f85149}
+.m-c{color:#ff4040;border-color:#ff4040;animation:pf 1s infinite}
+.loc-ov{position:absolute;top:6px;left:6px;background:rgba(0,0,0,.8);color:#777;padding:2px 6px;border-radius:3px;font-size:9px;border:1px solid #333;pointer-events:none;z-index:20}
+
+/* ═══ BOTTOM BAR ═══ */
+.bb{height:280px;display:flex;border-top:2px solid var(--border);background:var(--panel);flex-shrink:0}
+.pl{flex:1;display:flex;flex-direction:column;border-right:1px solid var(--border);min-width:0}
+.pr{width:160px;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:10px}
+.tabs{display:flex;border-bottom:1px solid var(--border);background:#000}
+.tb{flex:1;padding:10px 4px;background:0;border:none;color:#555;cursor:pointer;font-weight:bold;font-size:10px;font-family:inherit;letter-spacing:.5px;border-right:1px solid #1a1a1a}
+.tb:last-child{border-right:none}.tb.on{background:var(--panel);color:var(--accent);border-top:2px solid var(--accent)}
+.tc{flex:1;padding:10px;overflow-y:auto;display:none}.tc.on{display:block}
+.ag{display:flex;flex-direction:column;gap:6px}
+
+/* ═══ TILES ═══ */
+.mg{display:grid;background:#030303;border:1px solid #222}
+.tl{width:var(--tile);height:var(--tile);display:flex;align-items:center;justify-content:center;font-size:calc(var(--tile)*.6);position:relative;cursor:pointer}
+.t-fog{background:repeating-linear-gradient(45deg,#050505,#050505 5px,#080808 5px,#080808 10px)!important;color:transparent!important}
+.t-grass{background:#1b261b;color:#4a7a4a}.t-forest{background:#0a140a;color:#1b381b}
+.t-water{background:#2b6cb0;color:#81cdf0}.t-road{background:#262626;color:#444}
+.t-bridge{background:#1a1a1a;color:#555;border-left:2px solid #000;border-right:2px solid #000}
+.t-house{background:#3d342b;color:#a89f91;border:1px solid #5c4e42}
+.t-store{background:#263238;color:#90a4ae;border:1px solid #455a64}
+.t-camp{background:#2e221b;border:2px solid var(--accent)}
+.t-claimed{background:#2e2a1b;border:2px solid #7cc832}
+.t-dep{opacity:.45;filter:grayscale(1)}.t-mem{opacity:.35;filter:grayscale(.8)}
+.t-zomb{box-shadow:inset 0 0 8px rgba(218,54,51,.4)}
+.zi{position:absolute;z-index:8;filter:drop-shadow(0 0 3px rgba(200,0,0,.6));animation:zs 2s ease-in-out infinite}
+.pi{position:absolute;z-index:10;color:#fff;filter:drop-shadow(0 0 3px rgba(0,0,0,.9))}
+
+/* Interior tiles */
+.it-wall{background:#2a2520;color:#4a4540}.it-floor{background:#1a1815;color:#333}
+.it-door{background:#3a3020;color:#d29922;font-weight:bold}
+.it-window{background:#1a2530;color:#5588aa}
+.it-shelf{background:#3d342b;color:#cba86a}.it-counter{background:#2a2828;color:#888}
+.it-barr{position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(139,90,43,.3) 3px,rgba(139,90,43,.3) 6px);border:1px solid #8b5a2b;z-index:5;pointer-events:none}
+
+/* ═══ BUTTONS & ITEMS ═══ */
+.btn{background:#1a1f27;border:1px solid #2a2f37;color:var(--text);padding:10px;cursor:pointer;border-radius:4px;width:100%;text-align:left;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;font-family:inherit;font-size:12px}
+.btn:hover:not(:disabled){background:#2a2f37;border-color:#555}
+.btn:active:not(:disabled){background:#333;transform:scale(.97)}.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-a{padding:12px;justify-content:center;gap:8px;font-weight:bold}
+.btn-s{padding:8px;font-size:11px;color:#888}
+.btn-fight{background:#2a1515!important;border-color:#8b3030!important;color:#ff7b72!important}
+.btn-fight:active{background:#3a2020!important}
+.ib{cursor:pointer;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:3px;font-family:inherit;font-size:10px;padding:4px 8px;margin-left:3px;color:#999}
+.ib:hover{background:#2a2a2a;border-color:#444}.ib:active{transform:scale(.95)}
+.ib-u{color:#3498db}.ib-d{color:#666}
+.inv-w{font-size:11px;color:#555;text-align:right;margin-bottom:6px}.w-h{color:var(--danger);font-weight:bold}
+.ii,.eq{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#111;border:1px solid #252525;margin-bottom:4px;border-radius:4px;font-size:12px}
+.bs{font-size:9px;background:#2a2a2a;padding:2px 5px;border-radius:3px;color:#999;margin-left:4px}
+.dt{width:100%;height:3px;background:#1a1a1a;margin-top:4px;border-radius:2px}
+.df{height:100%;border-radius:2px;transition:width .3s}
+.sl{font-size:9px;color:#444;letter-spacing:1px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #1a1a1a}
+.sr{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1a1a1a;font-size:11px;color:#888}
+.sln{color:#444;text-transform:uppercase;font-size:9px;width:50px;flex-shrink:0;letter-spacing:.5px}
+.cs{display:flex;gap:10px;padding-bottom:8px;border-bottom:1px solid #222;margin-bottom:8px;color:#666;font-size:11px;flex-wrap:wrap}
+.cs strong{color:#ccc}
+
+/* ═══ D-PAD ═══ */
+.mp{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;width:100%}
+.mp .btn{margin-bottom:0;padding:14px;justify-content:center;font-weight:bold;font-size:14px}
+.cc{display:flex;align-items:center;justify-content:center;font-size:20px}
+
+/* ═══ DEATH SCREEN — hidden by default ═══ */
+.ds{position:fixed;inset:0;background:rgba(0,0,0,0);display:flex;align-items:center;justify-content:center;z-index:1000;pointer-events:none;opacity:0;transition:opacity 1.2s,background 1.5s}
+.ds.on{pointer-events:all;opacity:1;background:rgba(10,0,0,.92)}
+.dc{text-align:center;animation:df 1.5s ease forwards}
+.d-sk{font-size:64px;filter:drop-shadow(0 0 30px rgba(200,0,0,.4));animation:dp 3s ease-in-out infinite}
+.d-t{font-size:26px;font-weight:bold;color:var(--danger);letter-spacing:6px;margin:16px 0 24px;text-shadow:0 0 20px rgba(218,54,51,.3)}
+.d-s{color:#666;font-size:13px;display:flex;flex-direction:column;gap:8px;margin-bottom:30px}
+.d-s strong{color:#aaa}
+.d-b{background:#2a1010!important;border-color:var(--danger)!important;color:#f85149!important;width:auto!important;padding:14px 40px!important;font-size:14px!important;display:inline-flex!important;justify-content:center!important;letter-spacing:2px}
+
+/* ═══ ANIMATIONS ═══ */
+@keyframes pf{0%,100%{opacity:1}50%{opacity:.6}}
+@keyframes zs{0%,100%{transform:translateX(0)}25%{transform:translateX(-1px)}75%{transform:translateX(1px)}}
+@keyframes df{0%{transform:scale(.8);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes dp{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+
+/* ═══ MOBILE ═══ */
+@media(max-width:600px){
+.main{flex-direction:column}
+.mc{width:100%;height:45vh;border-right:none;border-bottom:1px solid var(--border);max-width:none}
+.lc{flex:1;min-height:0}.bb{height:240px}.pr{width:135px;padding:8px}
+.mp .btn{padding:12px}.sg{gap:6px;font-size:11px}
+}
+@media(max-height:700px){.bb{height:220px}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="header">
+    <div class="sg">
+      <span class="s-hp">♥ <span id="vHp">--</span></span>
+      <span class="s-stm">⚡ <span id="vStm">--</span></span>
+    </div>
+    <div class="sg">
+      <span class="s-h2o">💧 <span id="vH2o">--</span></span>
+      <span class="s-food">🍖 <span id="vFood">--</span></span>
+    </div>
+    <div class="day-d">
+      <span id="vDay" class="t-day">Day 1</span>
+      <span id="vTime" style="font-size:9px;color:#666">Morning</span>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="mc">
+      <div class="vp" id="viewport">
+        <div id="mapC"></div>
+        <div id="locOv" class="loc-ov">...</div>
+        <div id="moodles" class="moo"></div>
+        <div id="nightOv" class="night-ov"></div>
+      </div>
+      <div class="insp">
+        <div class="insp-i" id="iIcon">?</div>
+        <div style="min-width:0;flex:1">
+          <div id="iName" style="font-weight:bold;color:#fff;font-size:12px">Unknown</div>
+          <div id="iDesc" style="color:#888;font-size:10px">--</div>
+        </div>
+        <div id="iTags" style="margin-left:auto;white-space:nowrap;display:flex;gap:4px"></div>
+      </div>
+    </div>
+    <div class="lc">
+      <div class="lh">SURVIVAL LOG</div>
+      <div id="gameLog" class="ll"></div>
+    </div>
+  </div>
+
+  <div class="bb">
+    <div class="pl">
+      <div class="tabs">
+        <button class="tb on" data-tab="act" onclick="G.setTab('act')">ACTIONS</button>
+        <button class="tb" data-tab="inv" onclick="G.setTab('inv')">INV</button>
+        <button class="tb" data-tab="craft" onclick="G.setTab('craft')">CRAFT</button>
+        <button class="tb" data-tab="char" onclick="G.setTab('char')">STATUS</button>
+      </div>
+      <div id="tab-act" class="tc on"><div id="actList" class="ag"></div></div>
+      <div id="tab-inv" class="tc"><div id="invList"></div></div>
+      <div id="tab-craft" class="tc"><div id="craftList"></div></div>
+      <div id="tab-char" class="tc">
+        <div class="cs">
+          <span>👁 <strong id="sVis">0</strong></span>
+          <span>⚔️ <strong id="sAtk">0</strong></span>
+          <span>🛡️ <strong id="sDef">0</strong></span>
+          <span>🥾 <strong id="sMov">0</strong></span>
+          <span>💀 <strong id="sKills">0</strong></span>
+        </div>
+        <div id="equipList"></div>
+      </div>
+    </div>
+    <div class="pr">
+      <div class="mp">
+        <div></div>
+        <button class="btn" onclick="G.move(0,-1)">▲</button>
+        <div></div>
+        <button class="btn" onclick="G.move(-1,0)">◄</button>
+        <div class="cc">🧭</div>
+        <button class="btn" onclick="G.move(1,0)">►</button>
+        <div></div>
+        <button class="btn" onclick="G.move(0,1)">▼</button>
+        <div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Death Screen -->
+<div id="deathScr" class="ds">
+  <div class="dc">
+    <div class="d-sk">💀</div>
+    <div class="d-t">YOU DIED</div>
+    <div class="d-s">
+      <div>Survived <strong id="dDays">0</strong> days</div>
+      <div>Killed <strong id="dKills">0</strong> zombies</div>
+      <div><strong id="dTurns">0</strong> actions taken</div>
+    </div>
+    <button class="btn d-b" onclick="G.restart()">TRY AGAIN</button>
+  </div>
+</div>
+
+<!-- Load order: config → world → ui → game -->
+<script src="./config.js"></script>
+<script src="./world.js"></script>
+<script src="./ui.js"></script>
+<script src="./game.js"></script>
+<script>
+// Init with diagnostics — shows exactly which file failed to load
+window.onload = function() {
+  var missing = [];
+  if (typeof C === 'undefined') missing.push('config.js');
+  if (typeof World === 'undefined') missing.push('world.js');
+  if (typeof UI === 'undefined') missing.push('ui.js');
+  if (typeof Game === 'undefined') missing.push('game.js');
+  if (missing.length) {
+    document.getElementById('gameLog').innerHTML =
+      '<div class="le l-bad">Failed to load: ' + missing.join(', ') + '</div>' +
+      '<div class="le l-bad">Make sure all .js files are in the same folder as index.html</div>';
+    return;
+  }
+  try { G = new Game(); }
+  catch(e) {
+    document.getElementById('gameLog').innerHTML =
+      '<div class="le l-bad">Init error: ' + e.message + '</div>' +
+      '<div class="le" style="color:#666;font-size:10px">' + e.stack + '</div>';
+  }
+};
+</script>
+
+</body>
+</html>
