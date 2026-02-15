@@ -87,14 +87,28 @@ const UI = {
 
   /* Helper to get visual icon based on config settings */
   _getIcon(def) {
-    if (C.visuals && C.visuals.style === 'ascii' && def.txt) {
-      if (def.type === 'grass' && C.visuals.randomizeTerrain) {
-        // Simple randomization for grass
-        return [',', '.', '`', '⁖'][Math.floor(Math.random() * 4)];
+    // 1. Handle Randomization (Works for both 'emoji' and 'ascii' styles)
+    if (C.visuals && C.visuals.randomizeTerrain) {
+      if (def.type === 'grass') {
+        // Randomize grass punctuation for texture
+        const grassChars = [',', '.', '`', '´', '⁖', '\''];
+        return grassChars[Math.floor(Math.random() * grassChars.length)];
       }
+      if (def.type === 'forest') {
+        // Randomize trees
+        if (C.visuals.style === 'emoji') {
+           return ['🌲', '🌳', '🌲'][Math.floor(Math.random() * 3)];
+        } else {
+           return ['T', 't', 'Y', '¥'][Math.floor(Math.random() * 4)];
+        }
+      }
+    }
+
+    // 2. Standard Display Logic
+    if (C.visuals && C.visuals.style === 'ascii' && def.txt) {
       return def.txt;
     }
-    return def.icon || def.ch; // Fallback to 'ch' if 'icon' missing
+    return def.icon || def.txt; 
   },
 
   _wtile(g, x, y, zm) {
@@ -108,7 +122,6 @@ const UI = {
     if (vis) {
       e.classList.add(def.css);
       e.innerText = this._getIcon(def);
-      // REMOVED: The logic that added 't-dep' class when loot <= 0
       
       let k = `${x},${y}`;
       if (zm[k] && !(x === g.p.x && y === g.p.y)) {
@@ -151,7 +164,6 @@ const UI = {
         let e = document.createElement('div');
         e.className = 'tl ' + def.css;
         e.innerText = this._getIcon(def);
-        // Removed opacity drop for empty loot shelves to keep visual consistency
         
         if (cell.barricadeHp > 0) e.innerHTML += `<div class="it-barr"></div>`;
         let k = `${x},${y}`;
@@ -188,7 +200,6 @@ const UI = {
       document.getElementById('iIcon').innerText = this._getIcon(def);
       let name = cell.type.charAt(0).toUpperCase() + cell.type.slice(1);
       
-      // Better names
       if (def.container) name += ' (Container)';
       if (cell.type === 'door' || cell.type === 'pdoor') name = 'Doorway';
       if (cell.type === 'window') name = 'Window';
@@ -207,7 +218,6 @@ const UI = {
       let adj = Interior.getAdjacentSearchable(int, g.p.x, g.p.y);
       if (adj.length > 0) tags += `<span class="tag tag-l">LOOT NEARBY</span>`;
       
-      // Updated container tag logic to support shelves/lockers/etc
       let containers = g.getAdjacentContainers();
       if (containers.length > 0) {
         let count = 0;
@@ -268,24 +278,19 @@ const UI = {
       if (barr.length > 0 && g.skills.carpentry) html += `<button class="btn btn-a" onclick="G.barricade()">🪵 BARRICADE OPENING</button>`;
       if (onFloor) html += this._interiorPlaceButtons(g);
 
-      // Stairs navigation
       if (onStairs) {
         let stLabel = cellDef.stair === 'down' ? '▼ GO DOWNSTAIRS' : '▲ GO UPSTAIRS';
         html += `<button class="btn btn-a btn-stair" onclick="G.useStairs()">${stLabel}</button>`;
       }
 
-      // Rest — any interior gives indoor rest, bunker gives bunker rest
       html += this._restButton(g);
 
-      // Ground items indicator
       let gItems = g.getGroundItems();
       if (gItems.length > 0) html += `<button class="btn btn-a btn-ground" onclick="G.setTab('ground')">📋 ${gItems.length} ITEM${gItems.length > 1 ? 'S' : ''} ON GROUND</button>`;
 
-      // Container shortcut
       let containers = g.getAdjacentContainers();
       if (containers.length > 0) {
         let label = "CONTAINER";
-        // Try to be specific if there's just one type
         if (containers.length === 1) {
            if (containers[0].cell.type === 'shelf') label = "SHELF";
            else if (containers[0].cell.type === 'locker') label = "LOCKER";
@@ -320,7 +325,6 @@ const UI = {
         html += `<button class="btn btn-a" onclick="G.enterBuilding()">${icon} ${verb} ${name.toUpperCase()}</button>`;
       }
       html += this._worldPlaceButtons(g);
-      // Ground items indicator
       let gItems = g.getGroundItems();
       if (gItems.length > 0) html += `<button class="btn btn-a btn-ground" onclick="G.setTab('ground')">📋 ${gItems.length} ITEM${gItems.length > 1 ? 'S' : ''} ON GROUND</button>`;
       html += this._restButton(g);
@@ -476,7 +480,6 @@ const UI = {
     
     let h = `<div style="padding:6px 10px;font-weight:bold;font-size:11px;border-bottom:1px solid #222;color:#888">${name} CONTENTS: ${storage.length}</div>`;
     
-    // Store buttons — items from inv
     if (g.inv.length > 0) {
       h += `<div class="sl">STORE FROM INVENTORY</div>`;
       let seen = new Set();
@@ -488,7 +491,6 @@ const UI = {
         h += `<div class="ii"><div style="flex:1"><div style="color:#aaa">${d.icon} ${d.name} <span class="bs">×${total}</span></div></div><div><button class="ib ib-p" onclick="G.storeInContainer('${item.uid}')">STORE</button></div></div>`;
       }
     }
-    // Retrieve buttons
     if (storage.length > 0) {
       h += `<div class="sl">RETRIEVE FROM ${name}</div>`;
       h += storage.map((si, idx) => {
