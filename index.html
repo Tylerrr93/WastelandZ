@@ -99,39 +99,18 @@ display:flex;justify-content:space-between;align-items:center;height:42px;flex-s
 .tc{flex:1;padding:10px;overflow-y:auto;display:none}.tc.on{display:block}
 .ag{display:flex;flex-direction:column;gap:6px}
 
-/* ═══ TILES — world ═══ */
+/* ═══ TILES — updated for new visual system ═══ */
 .mg{display:grid;background:#030303;border:1px solid #222}
 .tl{width:var(--tile);height:var(--tile);display:flex;align-items:center;justify-content:center;font-size:calc(var(--tile)*.6);position:relative;cursor:pointer}
+
+/* FOG (Hidden tiles) */
 .t-fog{background:repeating-linear-gradient(45deg,#050505,#050505 5px,#080808 5px,#080808 10px)!important;color:transparent!important}
-.t-grass{background:#1b261b;color:#4a7a4a}.t-forest{background:#0a140a;color:#1b381b}
-.t-water{background:#2b6cb0;color:#81cdf0}.t-road{background:#262626;color:#444}
-.t-bridge{background:#1a1a1a;color:#555;border-left:2px solid #000;border-right:2px solid #000}
-.t-house{background:#3d342b;color:#a89f91;border:1px solid #5c4e42}
-.t-store{background:#263238;color:#90a4ae;border:1px solid #455a64}
-.t-garage{background:#302a28;color:#a0887a;border:1px solid #5a4a3a}
-.t-clinic{background:#1a2830;color:#80b0c0;border:1px solid #3a6080}
-.t-warehouse{background:#2a2a30;color:#909098;border:1px solid #4a4a58}
-.t-hatch{background:#2e221b;border:2px solid #8b6a20;box-shadow:inset 0 0 8px rgba(139,106,32,.3)}
-.t-bedroll{background:#2a2520;color:#a89070;border:1px solid #6b5540;box-shadow:inset 0 0 6px rgba(168,144,112,.15)}
-.t-shelter{background:#2a2e1b;color:#8aaa60;border:2px solid #5a7830;box-shadow:inset 0 0 6px rgba(138,170,96,.15)}
-.t-dep{opacity:.45;filter:grayscale(1)}.t-mem{opacity:.35;filter:grayscale(.8)}
-.t-zomb{box-shadow:inset 0 0 8px rgba(218,54,51,.4)}
+
+/* MEMORY (Visited tiles) - REMOVED GRAYSCALE, JUST OPACITY */
+.t-mem{opacity:0.5} 
+
 .zi{position:absolute;z-index:8;filter:drop-shadow(0 0 3px rgba(200,0,0,.6));animation:zs 2s ease-in-out infinite}
 .pi{position:absolute;z-index:10;color:#fff;filter:drop-shadow(0 0 3px rgba(0,0,0,.9))}
-
-/* ═══ TILES — interior ═══ */
-.it-wall{background:#2a2520;color:#4a4540}.it-floor{background:#1a1815;color:#333}
-.it-door{background:#3a3020;color:#d29922;font-weight:bold}
-.it-window{background:#1a2530;color:#5588aa}
-.it-shelf{background:#3d342b;color:#cba86a}.it-counter{background:#2a2828;color:#888}
-.it-ladder{background:#2a2210;color:#e8b830;font-weight:bold}
-.it-stup{background:#1a2a20;color:#50c878;font-weight:bold;font-size:calc(var(--tile)*.7)}
-.it-stdn{background:#2a1a1a;color:#c87850;font-weight:bold;font-size:calc(var(--tile)*.7)}
-.it-pwall{background:#3a3530;color:#6a6560;border:1px dashed #555}
-.it-pdoor{background:#3a3020;color:#c8a040;border:1px dashed #806020}
-.it-bwall{background:#1a1520;color:#3a3040;border:1px solid #2a2030}
-.it-bfloor{background:#12101a;color:#2a2838}
-.it-crate{background:#3a3020;color:#e8b830;border:1px solid #8a6a20}
 .it-barr{position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(139,90,43,.3) 3px,rgba(139,90,43,.3) 6px);border:1px solid #8b5a2b;z-index:5;pointer-events:none}
 
 /* ═══ BUTTONS ═══ */
@@ -207,7 +186,6 @@ display:flex;justify-content:space-between;align-items:center;height:42px;flex-s
 </head>
 <body>
 
-<!-- Intro Screen -->
 <div id="introScr" class="intro">
   <div id="introTxt" class="intro-txt">
     It's been years since you've seen the outside...<br><br>
@@ -309,7 +287,6 @@ display:flex;justify-content:space-between;align-items:center;height:42px;flex-s
   </div>
 </div>
 
-<!-- Death Screen -->
 <div id="deathScr" class="ds">
   <div class="dc">
     <div class="d-sk">💀</div>
