@@ -71,13 +71,17 @@ const World = {
   },
 };
 
+
 /* ═══════════════════════════════════════════════════════════
-   Interior Generation
+   Interior Generation — Multi-Floor Support
    ═══════════════════════════════════════════════════════════ */
+
 const Interior = {
+
   _charMap:       {'#':'wall','.':'floor','D':'door','W':'window','S':'shelf','C':'counter','L':'ladder','U':'stairs_up','B':'stairs_down'},
   _bunkerCharMap: {'R':'bwall','.':'bfloor','S':'shelf','L':'ladder','U':'stairs_up','B':'stairs_down'},
 
+  /** Generate a multi-floor building interior */
   generate(buildingType) {
     let layoutKey = buildingType;
     if (!C.layouts[layoutKey]) layoutKey = 'house';
@@ -85,33 +89,49 @@ const Interior = {
     let tmpl = templates[Math.floor(Math.random() * templates.length)];
     let groundFloor = this._buildFloor(tmpl, buildingType, 'Ground Floor');
 
-    let building = { floors: [groundFloor], buildingType, cleared: false };
+    let building = {
+      floors: [groundFloor],
+      buildingType,
+      cleared: false,
+    };
 
+    // Check for multi-floor
     let mf = C.multiFloor[buildingType];
     if (mf && Math.random() < mf.chance) {
       let extraTemplates = C.layouts[mf.extra];
       if (extraTemplates && extraTemplates.length > 0) {
         let extraTmpl = extraTemplates[Math.floor(Math.random() * extraTemplates.length)];
         let extraFloor = this._buildFloor(extraTmpl, buildingType, mf.label);
+
         if (mf.dir === 'down') {
+          // Ground floor gets stairs_down, extra floor is below
           this._addStairs(groundFloor, 'stairs_down');
           building.floors.push(extraFloor);
         } else {
+          // Ground floor gets stairs_up, extra floor is above
           this._addStairs(groundFloor, 'stairs_up');
           building.floors.push(extraFloor);
         }
       }
     }
+
     return building;
   },
 
+  /** Generate the starting bunker */
   generateBunker() {
     let tmpl = C.layouts.bunker[0];
     let floor = this._buildFloor(tmpl, 'bunker', 'Bunker');
-    return { floors: [floor], buildingType: 'bunker', cleared: true };
+    return {
+      floors: [floor],
+      buildingType: 'bunker',
+      cleared: true,
+    };
   },
 
+  /** Add a stairs tile to a random floor spot */
   _addStairs(floor, stairType) {
+    // Find an open floor tile not adjacent to the entry
     let candidates = [];
     for (let y = 1; y < floor.h - 1; y++)
       for (let x = 1; x < floor.w - 1; x++) {
@@ -124,6 +144,7 @@ const Interior = {
     floor.map[pick.y][pick.x].type = stairType;
   },
 
+  /** Build a single floor from template */
   _buildFloor(tmpl, buildingType, label) {
     let isBunker = (buildingType === 'bunker');
     let charMap = isBunker ? this._bunkerCharMap : this._charMap;
@@ -136,28 +157,31 @@ const Interior = {
         let ch = tmpl[y][x];
         let type = charMap[ch] || (isBunker ? 'bwall' : 'wall');
         let cell = { type, loot: 0, barricadeHp: 0 };
-        
-        let def = C.itiles[type];
-        if (def) {
-          if (def.searchable) cell.loot = 1; // Flag as having loot to generate
-          if (def.container) cell.storage = []; // Initialize storage array
-        }
-        
+        if (type === 'shelf') cell.loot = 3;
         if (type === 'door' || type === 'ladder') entryPos = { x, y };
         if (type === 'stairs_up') entryPos = entryPos || { x, y };
         row.push(cell);
       }
       map.push(row);
     }
+
+    // Fallback entry
     if (!entryPos) {
       for (let y = 0; y < h && !entryPos; y++)
         for (let x = 0; x < w && !entryPos; x++)
           if (C.itiles[map[y][x].type] && C.itiles[map[y][x].type].pass)
             entryPos = { x, y };
     }
+
     return { map, w, h, entryPos, label };
   },
 
+  /** Get the current floor data from a building */
+  getFloor(building, floorIdx) {
+    return building.floors[floorIdx] || building.floors[0];
+  },
+
+  /** Find stairs position on a floor */
   findStairs(floor, stairType) {
     for (let y = 0; y < floor.h; y++)
       for (let x = 0; x < floor.w; x++)
@@ -165,29 +189,36 @@ const Interior = {
     return null;
   },
 
-  // Generic adjacency helpers
-  _getAdj(floor, px, py, predicate) {
+  getAdjacentSearchable(floor, px, py) {
     let results = [];
     for (let [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
       let nx = px + dx, ny = py + dy;
       if (nx < 0 || nx >= floor.w || ny < 0 || ny >= floor.h) continue;
       let cell = floor.map[ny][nx], def = C.itiles[cell.type];
-      if (def && predicate(cell, def)) results.push({ x: nx, y: ny, cell });
+      if (def && def.searchable && cell.loot > 0) results.push({ x: nx, y: ny, cell });
     }
     return results;
   },
 
-  getAdjacentSearchable(floor, px, py) {
-    return this._getAdj(floor, px, py, (c, d) => d.searchable && c.loot > 0);
-  },
   getAdjacentBarricadable(floor, px, py) {
-    return this._getAdj(floor, px, py, (c, d) => d.barricadable && c.barricadeHp <= 0);
+    let results = [];
+    for (let [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
+      let nx = px + dx, ny = py + dy;
+      if (nx < 0 || nx >= floor.w || ny < 0 || ny >= floor.h) continue;
+      let cell = floor.map[ny][nx], def = C.itiles[cell.type];
+      if (def && def.barricadable && cell.barricadeHp <= 0) results.push({ x: nx, y: ny, cell });
+    }
+    return results;
   },
+
   getAdjacentSalvageable(floor, px, py) {
-    return this._getAdj(floor, px, py, (c, d) => d.salvageable);
+    let results = [];
+    for (let [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
+      let nx = px + dx, ny = py + dy;
+      if (nx < 0 || nx >= floor.w || ny < 0 || ny >= floor.h) continue;
+      let cell = floor.map[ny][nx], def = C.itiles[cell.type];
+      if (def && def.salvageable) results.push({ x: nx, y: ny, cell });
+    }
+    return results;
   },
-  getAdjacentContainers(floor, px, py) {
-    // Return any tile that is a container AND has storage initialized
-    return this._getAdj(floor, px, py, (c, d) => d.container && c.storage);
-  }
 };
