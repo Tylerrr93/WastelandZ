@@ -8,14 +8,15 @@ w: 60, h: 60,
 
 /* ── World Tiles ─────────────────────────────────────────── */
 tiles: {
-  grass:  {ch:',', css:'t-grass', pass:true,  cap:2, name:"Wild Grass",    desc:"Overgrown vegetation."},
-  forest: {ch:'🌲',css:'t-forest',pass:true,  cap:4, name:"Deep Woods",    desc:"Dense trees. Good cover."},
-  water:  {ch:'≈', css:'t-water', pass:false, cap:0, name:"Deep Water",    desc:"Impassable."},
-  road:   {ch:'·', css:'t-road',  pass:true,  cap:2, name:"Old Road",      desc:"Cracked asphalt."},
-  bridge: {ch:'=', css:'t-bridge',pass:true,  cap:0, name:"Bridge",        desc:"Safe crossing."},
-  house:  {ch:'🏠',css:'t-house', pass:true,  cap:3, name:"Ruined House",  desc:"Enterable. Search inside."},
-  store:  {ch:'🏪',css:'t-store', pass:true,  cap:5, name:"Grocery Store", desc:"Rich pickings inside."},
-  camp:   {ch:'⛺',css:'t-camp',  pass:true,  cap:0, name:"Base Camp",     desc:"Your starting camp."},
+  grass:   {ch:',', css:'t-grass',  pass:true,  cap:2, name:"Wild Grass",    desc:"Overgrown vegetation."},
+  forest:  {ch:'🌲',css:'t-forest', pass:true,  cap:4, name:"Deep Woods",    desc:"Dense trees. Good cover."},
+  water:   {ch:'≈', css:'t-water',  pass:false, cap:0, name:"Deep Water",    desc:"Impassable."},
+  road:    {ch:'·', css:'t-road',   pass:true,  cap:2, name:"Old Road",      desc:"Cracked asphalt."},
+  bridge:  {ch:'=', css:'t-bridge', pass:true,  cap:0, name:"Bridge",        desc:"Safe crossing."},
+  house:   {ch:'🏠',css:'t-house',  pass:true,  cap:3, name:"Ruined House",  desc:"Enterable. Search inside."},
+  store:   {ch:'🏪',css:'t-store',  pass:true,  cap:5, name:"Grocery Store", desc:"Rich pickings inside."},
+  camp:    {ch:'⛺',css:'t-camp',   pass:true,  cap:0, name:"Base Camp",     desc:"Your starting camp. Safe rest."},
+  bedroll: {ch:'🛏️',css:'t-bedroll',pass:true,  cap:0, name:"Bedroll",       desc:"Your makeshift sleeping spot."},
 },
 
 /* ── Interior Tile Types ─────────────────────────────────── */
@@ -54,6 +55,7 @@ items: {
   wood:      {name:"Plank",          type:'mat',   icon:'🪵',wgt:1.0,stack:10},
   nails:     {name:"Box of Nails",   type:'mat',   icon:'🔩',wgt:0.1,stack:100},
   cloth:     {name:"Cloth Strip",    type:'mat',   icon:'🧵',wgt:0.1,stack:20},
+  bedroll_k: {name:"Bedroll Kit",    type:'place', icon:'🛏️',wgt:2.0, placeTile:'bedroll'},
 },
 
 /* ── Enemies — add new types here + in zombieSpawns ──────── */
@@ -72,6 +74,7 @@ zombieSpawns: [
 recipes: {
   nail_bat:  {name:"Nail Bat",  reqSkill:null,            inputs:{wood:1,nails:6}, result:{type:'item',id:'bat',count:1}},
   bandage_c: {name:"Bandage",   reqSkill:null,            inputs:{cloth:2},         result:{type:'item',id:'bandage',count:1}},
+  bedroll:   {name:"Bedroll Kit",reqSkill:null,            inputs:{cloth:4,wood:2},  result:{type:'item',id:'bedroll_k',count:1}},
   barricade: {name:"Barricade", reqSkill:['carpentry',1], inputs:{wood:1,nails:3},  result:{type:'barricade'}},
 },
 
@@ -121,11 +124,29 @@ tuning: {
   tickThirst:     0.4,
   starveDmg:      1,
 
-  // Rest
+  // Rest — Tiered system
+  // Tier 3: Camp / Claimed Home (best)
   restFoodCost:   5,
   restWaterCost:  5,
   restStmRestore: 100,
   restHpRestore:  25,
+  restTicks:      3,
+
+  // Tier 2: Bedroll (mid)
+  bedrollFoodCost:   6,
+  bedrollWaterCost:  6,
+  bedrollStmRestore: 80,
+  bedrollHpRestore:  10,
+  bedrollTicks:      3,
+  bedrollAmbushChance: 0.10,
+
+  // Tier 1: Rough rest (poor — anywhere)
+  roughFoodCost:   8,
+  roughWaterCost:  8,
+  roughStmRestore: 55,
+  roughHpRestore:  0,
+  roughTicks:      4,
+  roughAmbushChance: 0.30,
 
   // Combat
   baseDmg:        1,

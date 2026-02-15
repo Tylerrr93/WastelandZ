@@ -19,16 +19,23 @@ const UI = {
 
   /* ── Header Stats ──────────────────────────────────────── */
   renderStats(g) {
-    const s = (id, v, mx) => {
+    const s = (id, v, mx, barId) => {
       let e = document.getElementById(id);
       if (!e) return;
       e.innerText = Math.floor(v);
       e.style.color = v < mx * 0.25 ? '#da3633' : '';
+      // Update micro-bar
+      let bar = document.getElementById(barId);
+      if (bar) {
+        let pct = Math.max(0, Math.min(100, (v / mx) * 100));
+        bar.style.width = pct + '%';
+        bar.style.background = pct < 25 ? '#da3633' : pct < 50 ? '#d29922' : '';
+      }
     };
-    s('vHp', g.stats.hp, 100);
-    s('vStm', g.stats.stm, 100);
-    s('vH2o', g.stats.h2o, 100);
-    s('vFood', g.stats.food, 100);
+    s('vHp', g.stats.hp, 100, 'barHp');
+    s('vStm', g.stats.stm, 100, 'barStm');
+    s('vH2o', g.stats.h2o, 100, 'barH2o');
+    s('vFood', g.stats.food, 100, 'barFood');
     let d = document.getElementById('vDay');
     if (d) { d.innerText = `Day ${g.day}`; d.className = g.isNight ? 't-night' : 't-day'; }
     let t = document.getElementById('vTime');
@@ -156,6 +163,12 @@ const UI = {
     document.getElementById('iDesc').innerText = def.desc;
     let tags = '';
     if (cur.loot > 0) tags += `<span class="tag tag-l">LOOT ×${cur.loot}</span>`;
+
+    // Rest tier indicator
+    let tier = g.getRestTier();
+    if (tier === 'home') tags += `<span class="tag tag-in">SAFE REST</span>`;
+    else if (tier === 'bedroll') tags += `<span class="tag tag-bed">BEDROLL</span>`;
+
     let adjZ = g.getAdjacentZombies();
     let nearZ = g.getNearbyZombieCount();
     if (adjZ.length > 0) tags += `<span class="tag tag-d">⚔️ ${adjZ.length} ADJACENT</span>`;
@@ -187,14 +200,14 @@ const UI = {
       if (adj.length > 0) html += `<button class="btn btn-a" onclick="G.searchInterior()">🔍 SEARCH SHELVES</button>`;
       if (barr.length > 0 && g.skills.carpentry) html += `<button class="btn btn-a" onclick="G.barricade()">🪵 BARRICADE OPENING</button>`;
       if (!int.claimed) html += `<button class="btn btn-a" onclick="G.claimBuilding()">🏠 CLAIM AS HOME</button>`;
-      if (int.claimed) html += `<button class="btn btn-a" onclick="G.rest()">💤 REST & HEAL</button>`;
+      if (int.claimed) html += `<button class="btn btn-a btn-rest" onclick="G.rest()">💤 REST & HEAL <small class="rest-tag rest-home">Safe</small></button>`;
       if (onEntry) html += `<button class="btn btn-a" onclick="G.exitBuilding()">🚪 EXIT BUILDING</button>`;
       html += `<button class="btn btn-s" onclick="G.wait()">⏳ Wait</button>`;
     } else {
       let tile = g.map[g.p.y][g.p.x];
       let canEnter = (tile.type === 'house' || tile.type === 'store');
-      let atBase = (tile.type === 'camp') || (canEnter && tile.interior && tile.interior.claimed);
       let adjZ = g.getAdjacentZombies();
+      let restTier = g.getRestTier();
 
       // Combat buttons for adjacent world zombies
       if (adjZ.length > 0) {
@@ -206,7 +219,24 @@ const UI = {
       }
       html += `<button class="btn btn-a" onclick="G.scavenge()">🔍 SCAVENGE AREA</button>`;
       if (canEnter) html += `<button class="btn btn-a" onclick="G.enterBuilding()">🚪 ENTER BUILDING</button>`;
-      if (atBase) html += `<button class="btn btn-a" onclick="G.rest()">💤 REST & HEAL</button>`;
+
+      // Bedroll placement / pickup
+      if (g.canPlaceBedroll()) {
+        html += `<button class="btn btn-a btn-camp" onclick="G.placeBedroll()">🛏️ LAY DOWN BEDROLL</button>`;
+      }
+      if (tile.type === 'bedroll') {
+        html += `<button class="btn btn-a" onclick="G.pickupBedroll()">📦 PACK UP BEDROLL</button>`;
+      }
+
+      // Rest button with tier indicator
+      if (restTier) {
+        let tierLabel, tierClass;
+        if (restTier === 'home') { tierLabel = 'Safe'; tierClass = 'rest-home'; }
+        else if (restTier === 'bedroll') { tierLabel = 'Bedroll'; tierClass = 'rest-bed'; }
+        else { tierLabel = 'Rough'; tierClass = 'rest-rough'; }
+        html += `<button class="btn btn-a btn-rest" onclick="G.rest()">💤 REST <small class="rest-tag ${tierClass}">${tierLabel}</small></button>`;
+      }
+
       html += `<button class="btn btn-s" onclick="G.wait()">⏳ Wait</button>`;
     }
     el.innerHTML = html;
@@ -226,7 +256,7 @@ const UI = {
     if (!el) return;
     let h = `<div class="inv-w ${g.isEncumbered ? 'w-h' : ''}">Weight: ${g.weight} / ${g.maxWeight} kg</div>`;
     if (g.inv.length === 0) {
-      el.innerHTML = h + '<div style="padding:15px;color:#555;text-align:center">Empty</div>';
+      el.innerHTML = h + '<div class="inv-empty">Empty</div>';
       return;
     }
     h += g.inv.map(item => {
@@ -238,13 +268,20 @@ const UI = {
         let cl = p > 50 ? '#2ea043' : p > 20 ? '#d29922' : '#da3633';
         db = `<div class="dt"><div class="df" style="width:${p}%;background:${cl}"></div></div>`;
       }
+      let typeTag = '';
+      if (d.type === 'mat') typeTag = '<span class="item-type type-mat">MAT</span>';
+      else if (d.type === 'use') typeTag = '<span class="item-type type-use">USE</span>';
+      else if (d.type === 'read') typeTag = '<span class="item-type type-read">READ</span>';
+      else if (d.type === 'place') typeTag = '<span class="item-type type-place">PLACE</span>';
       let b = '';
       if (d.type === 'use' || d.type === 'read')
         b += `<button class="ib ib-u" onclick="G.useItem('${item.uid}')">USE</button>`;
+      else if (d.type === 'place')
+        b += ''; // placed via actions tab
       else if (d.type !== 'mat')
         b += `<button class="ib" onclick="G.equipItem('${item.uid}')">EQP</button>`;
       b += `<button class="ib ib-d" onclick="G.dropItem('${item.uid}')">DROP</button>`;
-      return `<div class="ii"><div style="flex:1;min-width:0"><div style="font-weight:bold;color:#ccc">${d.icon} ${d.name} ${sb}</div>${db}</div><div style="margin-left:8px;display:flex">${b}</div></div>`;
+      return `<div class="ii"><div style="flex:1;min-width:0"><div class="ii-name">${d.icon} ${d.name} ${sb} ${typeTag}</div>${db}</div><div class="ii-btns">${b}</div></div>`;
     }).join('');
     el.innerHTML = h;
   },
@@ -259,7 +296,7 @@ const UI = {
       if (r.result.type === 'barricade' && g.location !== 'interior') return '';
       let hs = true;
       if (r.reqSkill && !g.skills[r.reqSkill[0]]) hs = false;
-      if (!hs) return `<button class="btn" disabled style="opacity:.3"><span>${r.name} <small>(Unknown Skill)</small></span></button>`;
+      if (!hs) return `<button class="btn btn-craft" disabled style="opacity:.3"><span>${r.name} <small>(Unknown Skill)</small></span></button>`;
       let cc = true, mr = [];
       for (let m in r.inputs) {
         let req = r.inputs[m], has = g.countItem(m);
@@ -267,7 +304,15 @@ const UI = {
         let cl = has >= req ? '#666' : '#da3633';
         mr.push(`<span style="color:${cl}">${has}/${req} ${C.items[m].name}</span>`);
       }
-      return `<button class="btn" style="${cc ? '' : 'color:#777;border-color:#333'}" onclick="G.build('${k}')"><div style="width:100%"><div style="font-weight:bold">${r.name}</div><div style="font-size:10px;margin-top:3px">${mr.join(' · ')}</div></div></button>`;
+      // Show result info
+      let resultInfo = '';
+      if (r.result.type === 'item') {
+        let rd = C.items[r.result.id];
+        resultInfo = `→ ${rd.icon} ${rd.name}`;
+      } else if (r.result.type === 'barricade') {
+        resultInfo = '→ Boards up opening';
+      }
+      return `<button class="btn btn-craft" style="${cc ? '' : 'color:#777;border-color:#333'}" onclick="G.build('${k}')"><div style="width:100%"><div class="craft-name">${r.name} <span class="craft-result">${resultInfo}</span></div><div class="craft-mats">${mr.join(' · ')}</div></div></button>`;
     }).join('');
     el.innerHTML = h;
   },
@@ -292,12 +337,22 @@ const UI = {
         let cl = p > 50 ? '#2ea043' : p > 20 ? '#d29922' : '#da3633';
         di = `<span style="color:${cl};font-size:10px;margin-left:4px">${p}%</span>`;
       }
-      return `<div class="eq"><span class="sln">${sl}</span><span style="flex:1">${it ? C.items[it.id].icon + ' ' + C.items[it.id].name + di : '--'}</span>${it ? `<button class="ib ib-d" onclick="G.unequip('${sl}')">✕</button>` : ''}</div>`;
+      return `<div class="eq"><span class="sln">${sl}</span><span style="flex:1">${it ? C.items[it.id].icon + ' ' + C.items[it.id].name + di : '<span style="color:#333">--</span>'}</span>${it ? `<button class="ib ib-d" onclick="G.unequip('${sl}')">✕</button>` : ''}</div>`;
     }).join('');
+
+    // Camp status section
+    h += `<div class="sl" style="margin-top:8px">CAMP STATUS</div>`;
+    if (g.bedrollPos) {
+      h += `<div class="sr"><span>🛏️ Bedroll</span><span style="color:#6e8844">${g.bedrollPos.x}, ${g.bedrollPos.y}</span></div>`;
+    } else {
+      h += `<div class="sr"><span>🛏️ Bedroll</span><span style="color:#333">Not placed</span></div>`;
+    }
+    h += `<div class="sr"><span>⛺ Base Camp</span><span style="color:#6e8844">Start</span></div>`;
+
     document.getElementById('equipList').innerHTML = h;
   },
 
-  /* ── Moodles (NO "Inside" moodle — location overlay handles it) ── */
+  /* ── Moodles ───────────────────────────────────────────── */
   renderMoodles(g) {
     let el = document.getElementById('moodles');
     if (!el) return;
@@ -327,7 +382,9 @@ const UI = {
 
   renderLog(g) {
     let e = document.getElementById('gameLog');
-    if (e) e.innerHTML = g.log.slice(0, 50).map(l => `<div class="le ${l.c}">${l.m}</div>`).join('');
+    if (e) e.innerHTML = g.log.slice(0, 50).map((l, i) =>
+      `<div class="le ${l.c}" style="animation-delay:${i === 0 ? '0s' : 'none'}">${l.m}</div>`
+    ).join('');
   },
 
   showDeath(g) {

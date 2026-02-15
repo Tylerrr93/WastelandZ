@@ -27,6 +27,9 @@ class Game {
     this.currentBuildingTile = null;  // world tile reference
     this.interiorZombies = [];       // zombies inside current building
 
+    // Bedroll tracking — only one placed at a time
+    this.bedrollPos = null;          // {x, y} or null
+
     // Init starting skills
     for (let k in C.skills) {
       if (C.skills[k].start) this.skills[k] = { lvl: 1, xp: 0 };
@@ -109,6 +112,33 @@ class Game {
   get timeOfDay() {
     let p = (this.turn % C.tuning.turnsPerDay) / C.tuning.turnsPerDay;
     return p < .25 ? 'Morning' : p < .5 ? 'Midday' : p < .65 ? 'Afternoon' : p < .75 ? 'Evening' : 'Night';
+  }
+
+
+  /* ══════════════════════════════════════════════════════════
+     REST TIER — determine what quality of rest is available
+     ══════════════════════════════════════════════════════════ */
+
+  /**
+   * Returns the best rest tier available at the player's current position.
+   * 'home'    = camp tile, claimed interior, or standing on claimed building in world
+   * 'bedroll' = on a bedroll tile in the world
+   * 'rough'   = anywhere passable on the world map
+   * null      = cannot rest (e.g. inside un-claimed building, or on water)
+   */
+  getRestTier() {
+    if (this.location === 'interior') {
+      if (this.currentInterior && this.currentInterior.claimed) return 'home';
+      return null; // can't rough-rest indoors
+    }
+    // World map
+    let tile = this.map[this.p.y][this.p.x];
+    if (tile.type === 'camp') return 'home';
+    if ((tile.type === 'house' || tile.type === 'store') && tile.interior && tile.interior.claimed) return 'home';
+    if (tile.type === 'bedroll') return 'bedroll';
+    // Can rough-rest on any passable outdoor tile
+    if (C.tiles[tile.type] && C.tiles[tile.type].pass) return 'rough';
+    return null;
   }
 
 
@@ -352,33 +382,26 @@ class Game {
 
   /**
    * Move zombies — each moves on its own speed timer.
-   * No outer gate. Shamblers every 4 turns, Runners every 2, Brutes every 5.
    */
   _moveZombies() {
     const t = C.tuning;
-    // Iterate over copy so combat removal is safe
     let list = [...this.zombies];
     for (let z of list) {
-      // Skip if this zombie was killed mid-loop
       if (!this.zombies.includes(z)) continue;
 
       let ed = C.enemies[z.type];
-      // Each zombie moves based on its own speed
       if (this.turn % ed.speed !== 0) continue;
 
       let dist = Math.abs(z.x - this.p.x) + Math.abs(z.y - this.p.y);
       let dx = 0, dy = 0;
 
       if (dist <= t.zombieAggro && this.location === 'world') {
-        // Chase player
         dx = Math.sign(this.p.x - z.x);
         dy = Math.sign(this.p.y - z.y);
-        // Pick one direction randomly to avoid diagonal
         if (dx !== 0 && dy !== 0) {
           if (Math.random() < .5) dx = 0; else dy = 0;
         }
       } else {
-        // Wander randomly
         let dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]];
         let pick = dirs[Math.floor(Math.random() * dirs.length)];
         dx = pick[0]; dy = pick[1];
@@ -389,13 +412,10 @@ class Game {
       if (!C.tiles[this.map[ny][nx].type].pass) continue;
       if (this.zombies.some(o => o !== z && o.x === nx && o.y === ny)) continue;
 
-      // Check if zombie walks onto player
       if (nx === this.p.x && ny === this.p.y && this.location === 'world') {
-        // Zombie ambushes player (zombie gets first strike)
-        z.x = nx; z.y = ny; // zombie is now on player tile
+        z.x = nx; z.y = ny;
         this._zombieAmbush(z, false);
         if (!this.alive) return;
-        // If zombie survived, push it back to its old spot
         if (this.zombies.includes(z)) { z.x -= dx; z.y -= dy; }
         continue;
       }
@@ -553,31 +573,190 @@ class Game {
     if (int.claimed) return this.logMsg("Already claimed!", "l-bad");
     int.claimed = true;
     this.logMsg("Claimed this building as your home!", "l-imp");
-    this.logMsg("You can now rest here.", "l-good");
+    this.logMsg("You can now rest safely here.", "l-good");
     UI.fullRender(this);
   }
+
+
+  /* ══════════════════════════════════════════════════════════
+     REST — Tiered system (rough → bedroll → home)
+     ══════════════════════════════════════════════════════════ */
 
   rest() {
     if (!this.alive) return;
     const t = C.tuning;
-    let canRest = false;
-    if (this.location === 'interior' && this.currentInterior && this.currentInterior.claimed) canRest = true;
-    if (this.location === 'world') {
-      let tile = this.map[this.p.y][this.p.x];
-      if (tile.type === 'camp') canRest = true;
-      if ((tile.type === 'house' || tile.type === 'store') && tile.interior && tile.interior.claimed) canRest = true;
+    let tier = this.getRestTier();
+
+    if (!tier) {
+      return this.logMsg("Can't rest here. Try outside or find shelter.", "l-bad");
     }
-    if (!canRest) return this.logMsg("Find your camp or claimed home to rest.", "l-bad");
-    if (this.stats.food < t.restFoodCost || this.stats.h2o < t.restWaterCost)
-      return this.logMsg("Need food & water to rest.", "l-bad");
-    this.stats.food -= t.restFoodCost;
-    this.stats.h2o -= t.restWaterCost;
-    this.stats.stm = t.restStmRestore;
-    this.stats.hp = Math.min(100, this.stats.hp + t.restHpRestore);
-    this.logMsg("Rested. Stamina restored, wounds healing.", "l-good");
-    for (let i = 0; i < 3; i++) this.tick();
+
+    // Check adjacent zombies — can't rest with zombies right next to you
+    let adjZ = this.location === 'interior'
+      ? this.getAdjacentInteriorZombies()
+      : this.getAdjacentZombies();
+    if (adjZ.length > 0) {
+      return this.logMsg("Can't rest — zombies too close!", "l-bad");
+    }
+
+    let foodCost, waterCost, stmRestore, hpRestore, ticks, ambushChance;
+
+    if (tier === 'home') {
+      foodCost = t.restFoodCost;
+      waterCost = t.restWaterCost;
+      stmRestore = t.restStmRestore;
+      hpRestore = t.restHpRestore;
+      ticks = t.restTicks;
+      ambushChance = 0;
+    } else if (tier === 'bedroll') {
+      foodCost = t.bedrollFoodCost;
+      waterCost = t.bedrollWaterCost;
+      stmRestore = t.bedrollStmRestore;
+      hpRestore = t.bedrollHpRestore;
+      ticks = t.bedrollTicks;
+      ambushChance = t.bedrollAmbushChance;
+    } else {
+      // rough
+      foodCost = t.roughFoodCost;
+      waterCost = t.roughWaterCost;
+      stmRestore = t.roughStmRestore;
+      hpRestore = t.roughHpRestore;
+      ticks = t.roughTicks;
+      ambushChance = t.roughAmbushChance;
+    }
+
+    if (this.stats.food < foodCost || this.stats.h2o < waterCost) {
+      return this.logMsg(`Need ${foodCost} food & ${waterCost} water to rest.`, "l-bad");
+    }
+
+    this.stats.food -= foodCost;
+    this.stats.h2o -= waterCost;
+
+    // Check for ambush interruption (rough & bedroll only)
+    if (ambushChance > 0 && Math.random() < ambushChance) {
+      // Interrupted! Partial rest only
+      this.stats.stm = Math.min(100, this.stats.stm + Math.floor(stmRestore * 0.3));
+      this.logMsg("⚠️ Woken by sounds in the dark!", "l-bad");
+
+      // Spawn a zombie nearby
+      let spawned = false;
+      for (let a = 0; a < 50 && !spawned; a++) {
+        let dirs = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
+        let dir = dirs[Math.floor(Math.random() * dirs.length)];
+        let sx = this.p.x + dir[0], sy = this.p.y + dir[1];
+        if (sx >= 0 && sx < C.w && sy >= 0 && sy < C.h) {
+          let st = this.map[sy][sx];
+          if (C.tiles[st.type].pass && !this.zombies.some(z => z.x === sx && z.y === sy)) {
+            let tid = this._wPick(C.zombieSpawns.filter(s => s.id !== 'brute'));
+            let ed = C.enemies[tid];
+            this.zombies.push({ x: sx, y: sy, type: tid, hp: ed.hp, maxHp: ed.hp });
+            this.logMsg(`${ed.icon} ${ed.name} appeared nearby!`, "l-bad");
+            spawned = true;
+          }
+        }
+      }
+
+      for (let i = 0; i < 2; i++) this.tick();
+      UI.fullRender(this);
+      return;
+    }
+
+    // Successful rest
+    this.stats.stm = Math.min(100, this.stats.stm + stmRestore);
+    this.stats.hp = Math.min(100, this.stats.hp + hpRestore);
+
+    if (tier === 'home') {
+      this.logMsg("Rested well. Stamina restored, wounds healing.", "l-good");
+    } else if (tier === 'bedroll') {
+      this.logMsg("Slept in your bedroll. Decent rest.", "l-good");
+    } else {
+      this.logMsg("Slept rough on the ground. Stiff but rested.", "l-imp");
+    }
+
+    for (let i = 0; i < ticks; i++) this.tick();
     UI.fullRender(this);
   }
+
+
+  /* ══════════════════════════════════════════════════════════
+     BEDROLL PLACEMENT — open-world camp system
+     ══════════════════════════════════════════════════════════ */
+
+  /**
+   * Check if the player has a placeable bedroll in inventory
+   */
+  hasBedrollItem() {
+    return this.inv.some(i => C.items[i.id].type === 'place' && C.items[i.id].placeTile === 'bedroll');
+  }
+
+  /**
+   * Check if the current world tile allows bedroll placement
+   */
+  canPlaceBedroll() {
+    if (this.location !== 'world') return false;
+    let tile = this.map[this.p.y][this.p.x];
+    // Can place on grass, forest, road — not on buildings, water, camp, or existing bedroll
+    let allowed = ['grass', 'forest', 'road'];
+    return allowed.includes(tile.type) && this.hasBedrollItem();
+  }
+
+  /**
+   * Place bedroll at current position. Removes old bedroll if one exists.
+   */
+  placeBedroll() {
+    if (!this.alive || !this.canPlaceBedroll()) return;
+
+    // Remove old bedroll from map if one exists
+    if (this.bedrollPos) {
+      let old = this.map[this.bedrollPos.y][this.bedrollPos.x];
+      if (old.type === 'bedroll') {
+        // Restore original terrain type (default to grass)
+        this.map[this.bedrollPos.y][this.bedrollPos.x] = World.tile(old._originalType || 'grass');
+      }
+      this.logMsg("Picked up your old bedroll.", "l-imp");
+    }
+
+    // Remember original terrain type before converting
+    let currentTile = this.map[this.p.y][this.p.x];
+    let origType = currentTile.type;
+
+    // Remove bedroll kit from inventory
+    let bIdx = this.inv.findIndex(i => C.items[i.id].type === 'place' && C.items[i.id].placeTile === 'bedroll');
+    if (bIdx === -1) return;
+    let bItem = this.inv[bIdx];
+    bItem.qty--;
+    if (bItem.qty <= 0) this.inv.splice(bIdx, 1);
+
+    // Place bedroll tile
+    let newTile = World.tile('bedroll');
+    newTile._originalType = origType;
+    this.map[this.p.y][this.p.x] = newTile;
+    this.bedrollPos = { x: this.p.x, y: this.p.y };
+
+    this.gainXp('survival', 5);
+    this.logMsg("Laid out your bedroll. You can rest here now.", "l-good");
+    this.tick();
+    UI.fullRender(this);
+  }
+
+  /**
+   * Pick up bedroll from current position, returning it to inventory.
+   */
+  pickupBedroll() {
+    if (!this.alive || this.location !== 'world') return;
+    let tile = this.map[this.p.y][this.p.x];
+    if (tile.type !== 'bedroll') return;
+
+    // Restore original terrain
+    this.map[this.p.y][this.p.x] = World.tile(tile._originalType || 'grass');
+    this.bedrollPos = null;
+
+    // Return bedroll to inventory
+    this.addItem('bedroll_k', 1);
+    this.logMsg("Packed up your bedroll.", "l-imp");
+    UI.fullRender(this);
+  }
+
 
   wait() {
     if (!this.alive) return;
