@@ -8,32 +8,36 @@ w: 60, h: 60,
 
 /* ── World Tiles ─────────────────────────────────────────── */
 tiles: {
-  grass:     {ch:',', css:'t-grass',    pass:true,  cap:2, name:"Wild Grass",      desc:"Overgrown vegetation.", placeable:true},
-  forest:    {ch:'🌲',css:'t-forest',   pass:true,  cap:4, name:"Deep Woods",      desc:"Dense trees. Good cover.", placeable:true},
-  water:     {ch:'≈', css:'t-water',    pass:false, cap:0, name:"Deep Water",      desc:"Impassable."},
-  road:      {ch:'·', css:'t-road',     pass:true,  cap:2, name:"Old Road",        desc:"Cracked asphalt.", placeable:true},
-  bridge:    {ch:'=', css:'t-bridge',   pass:true,  cap:0, name:"Bridge",          desc:"Safe crossing."},
-  house:     {ch:'🏠',css:'t-house',    pass:true,  cap:3, name:"Ruined House",    desc:"Enterable. Search inside.", enter:true, buildName:"House"},
-  store:     {ch:'🏪',css:'t-store',    pass:true,  cap:5, name:"Grocery Store",   desc:"Rich pickings inside.", enter:true, buildName:"Store"},
-  garage:    {ch:'🔧',css:'t-garage',   pass:true,  cap:3, name:"Auto Garage",     desc:"Might find tools.", enter:true, buildName:"Garage"},
-  clinic:    {ch:'🏥',css:'t-clinic',   pass:true,  cap:4, name:"Medical Clinic",  desc:"Could have medical supplies.", enter:true, buildName:"Clinic"},
-  warehouse: {ch:'🏭',css:'t-warehouse',pass:true,  cap:6, name:"Warehouse",       desc:"Large storage building.", enter:true, buildName:"Warehouse"},
-  camp:      {ch:'⛺',css:'t-camp',     pass:true,  cap:0, name:"Base Camp",       desc:"Your home base. Bunker below.", enter:true, buildName:"Bunker"},
-  bedroll:   {ch:'🛌',css:'t-bedroll',  pass:true,  cap:0, name:"Bedroll",         desc:"A rough sleeping spot."},
-  shelter:   {ch:'🏕️',css:'t-shelter',  pass:true,  cap:0, name:"Lean-To",         desc:"A sturdy shelter."},
+  grass:        {ch:',', css:'t-grass',      pass:true,  cap:2, name:"Wild Grass",      desc:"Overgrown vegetation.", placeable:true},
+  forest:       {ch:'🌲',css:'t-forest',     pass:true,  cap:4, name:"Deep Woods",      desc:"Dense trees. Good cover.", placeable:true},
+  water:        {ch:'≈', css:'t-water',      pass:false, cap:0, name:"Deep Water",      desc:"Impassable."},
+  road:         {ch:'·', css:'t-road',       pass:true,  cap:2, name:"Old Road",        desc:"Cracked asphalt.", placeable:true},
+  bridge:       {ch:'=', css:'t-bridge',     pass:true,  cap:0, name:"Bridge",          desc:"Safe crossing."},
+  house:        {ch:'🏚️',css:'t-house',      pass:true,  cap:3, name:"Abandoned House",  desc:"Enterable. Search inside.", enter:true, buildName:"House"},
+  store:        {ch:'🛒',css:'t-store',      pass:true,  cap:5, name:"Looted Store",     desc:"Rich pickings inside.", enter:true, buildName:"Store"},
+  garage:       {ch:'⚙️',css:'t-garage',     pass:true,  cap:3, name:"Auto Garage",      desc:"Might find tools.", enter:true, buildName:"Garage"},
+  clinic:       {ch:'➕',css:'t-clinic',     pass:true,  cap:4, name:"Medical Clinic",   desc:"Could have medical supplies.", enter:true, buildName:"Clinic"},
+  warehouse:    {ch:'📦',css:'t-warehouse',  pass:true,  cap:6, name:"Warehouse",        desc:"Large storage building.", enter:true, buildName:"Warehouse"},
+  bunker_hatch: {ch:'🔒',css:'t-hatch',      pass:true,  cap:0, name:"Bunker Hatch",     desc:"Your underground shelter.", enter:true, buildName:"Bunker"},
+  bedroll:      {ch:'🛌',css:'t-bedroll',    pass:true,  cap:0, name:"Bedroll",          desc:"A rough sleeping spot."},
+  shelter:      {ch:'🏕️',css:'t-shelter',    pass:true,  cap:0, name:"Lean-To",          desc:"A sturdy shelter."},
 },
 
 /* ── Interior Tile Types ─────────────────────────────────── */
 itiles: {
-  wall:    {ch:'▓', css:'it-wall',    pass:false},
-  floor:   {ch:'·', css:'it-floor',   pass:true},
-  door:    {ch:'╬', css:'it-door',    pass:true, entry:true, barricadable:true},
-  window:  {ch:'▢', css:'it-window',  pass:true, entry:true, barricadable:true},
-  shelf:   {ch:'📦',css:'it-shelf',   pass:false, searchable:true, salvageable:true},
-  counter: {ch:'🔲',css:'it-counter', pass:false, searchable:true, salvageable:true},
-  ladder:  {ch:'🪜',css:'it-ladder',  pass:true, entry:true},
-  pwall:   {ch:'▓', css:'it-pwall',   pass:false, salvageable:true},
-  pdoor:   {ch:'╬', css:'it-pdoor',   pass:true, barricadable:true, salvageable:true},
+  wall:       {ch:'▓', css:'it-wall',      pass:false},
+  floor:      {ch:'·', css:'it-floor',     pass:true},
+  door:       {ch:'╬', css:'it-door',      pass:true, entry:true, barricadable:true},
+  window:     {ch:'▢', css:'it-window',    pass:true, entry:true, barricadable:true},
+  shelf:      {ch:'📦',css:'it-shelf',     pass:false, searchable:true, salvageable:true},
+  counter:    {ch:'🔲',css:'it-counter',   pass:false, searchable:true, salvageable:true},
+  ladder:     {ch:'🪜',css:'it-ladder',    pass:true, entry:true},
+  stairs_up:  {ch:'▲', css:'it-stup',      pass:true, stair:'up'},
+  stairs_down:{ch:'▼', css:'it-stdn',      pass:true, stair:'down'},
+  pwall:      {ch:'▓', css:'it-pwall',     pass:false, salvageable:true},
+  pdoor:      {ch:'╬', css:'it-pdoor',     pass:true, barricadable:true, salvageable:true},
+  bwall:      {ch:'█', css:'it-bwall',     pass:false},
+  bfloor:     {ch:'░', css:'it-bfloor',    pass:true},
 },
 
 /* ── Salvage Yields ─────────────────────────────────────── */
@@ -91,17 +95,14 @@ zombieSpawns: [
   {id:'brute',   weight:1},
 ],
 
-/* ── Recipes (cat = crafting panel category) ─────────────── */
+/* ── Recipes ─────────────────────────────────────────────── */
 recipes: {
-  // Survival
   bandage_c:   {name:"Bandage",      cat:'survival', reqSkill:null,            inputs:{cloth:2},                result:{type:'item',id:'bandage',count:1}},
   torch_c:     {name:"Torch",        cat:'survival', reqSkill:null,            inputs:{wood:1,cloth:2},         result:{type:'item',id:'torch',count:1}},
   med_kit_c:   {name:"First Aid Kit",cat:'survival', reqSkill:null,            inputs:{bandage:2,cloth:1},      result:{type:'item',id:'med_kit',count:1}},
   bedroll_c:   {name:"Bedroll Kit",   cat:'survival', reqSkill:null,            inputs:{cloth:5},                result:{type:'item',id:'bedroll_kit',count:1}},
-  // Combat
   pipe_c:      {name:"Lead Pipe",    cat:'combat',   reqSkill:null,            inputs:{scrap:2},                result:{type:'item',id:'pipe',count:1}},
   nail_bat:    {name:"Nail Bat",     cat:'combat',   reqSkill:null,            inputs:{wood:1,nails:6},         result:{type:'item',id:'bat',count:1}},
-  // Building
   wall_frame:  {name:"Wall Frame",   cat:'building', reqSkill:['carpentry',1], inputs:{wood:2,nails:4},         result:{type:'item',id:'wall_frame',count:1}},
   door_frame:  {name:"Door Frame",   cat:'building', reqSkill:['carpentry',1], inputs:{wood:2,nails:2},         result:{type:'item',id:'door_frame',count:1}},
   shelter_c:   {name:"Lean-To Kit",  cat:'building', reqSkill:['carpentry',1], inputs:{wood:3,cloth:3,nails:4}, result:{type:'item',id:'shelter_kit',count:1}},
@@ -115,10 +116,10 @@ restTiers: {
             msg:["The bedroll keeps the worst of the cold out.", "Managed some real sleep for once.", "Not luxury, but the bedroll helps."]},
   shelter: {stm:100, hp:20, food:5,  water:5,  ticks:3, label:"Lean-To",
             msg:["Sheltered from the wind. Slept well.", "The lean-to kept you hidden and warm.", "Proper rest under cover. Feeling strong."]},
-  camp:    {stm:100, hp:15, food:5,  water:5,  ticks:3, label:"Camp",
-            msg:["Rested at camp. Familiar ground.", "Home base. You sleep soundly.", "Camp rest. Ready to move."]},
-  home:    {stm:100, hp:25, food:5,  water:5,  ticks:3, label:"Home",
-            msg:["Slept behind barricaded walls. Wounds healing.", "The closest thing to safety out here.", "A full rest in your claimed home."]},
+  indoor:  {stm:100, hp:15, food:5,  water:5,  ticks:3, label:"Indoors",
+            msg:["Walls around you. Better than nothing.", "Rested inside. The roof helps.", "Slept behind walls. Not bad."]},
+  bunker:  {stm:100, hp:25, food:5,  water:5,  ticks:3, label:"Bunker",
+            msg:["Underground and safe. Full rest.", "The bunker keeps everything out.", "Slept deep underground. Wounds heal."]},
 },
 
 /* ── Loot Pools ──────────────────────────────────────────── */
@@ -135,66 +136,68 @@ lootPools: {
   shelf_garage:    [{id:'scrap',weight:15},{id:'nails',weight:12},{id:'hammer',weight:5},{id:'pipe',weight:4},{id:'wood',weight:8},{id:'flashlight',weight:3},{id:'boots',weight:2}],
   shelf_clinic:    [{id:'bandage',weight:15},{id:'med_kit',weight:6},{id:'cloth',weight:10},{id:'water_b',weight:8},{id:'book_carp',weight:2}],
   shelf_warehouse: [{id:'wood',weight:12},{id:'nails',weight:15},{id:'scrap',weight:12},{id:'cloth',weight:10},{id:'canned',weight:6},{id:'jerky',weight:4},{id:'backpack',weight:3},{id:'boots',weight:2}],
+  shelf_bunker:    [{id:'canned',weight:10},{id:'water_b',weight:10},{id:'bandage',weight:8},{id:'cloth',weight:5},{id:'nails',weight:5}],
 },
 tileLoot: {grass:'nature', forest:'nature', road:'road', house:'house', store:'store', garage:'garage', clinic:'clinic', warehouse:'warehouse'},
 
 /* ── Interior Layouts ────────────────────────────────────── */
-/* # wall  . floor  D door  W window  S shelf  L ladder   */
-/* RULE: all entrances (D/W/L) must be on the EDGE of the grid */
+/* # wall  . floor  D door  W window  S shelf  C counter   */
+/* L ladder  U stairs_up  B stairs_down  R bunker wall     */
+/* RULE: all entrances (D/W/L) on EDGE of grid             */
 layouts: {
   house: [
-    // 7x7 — standard
     ["#######","#S...S#","#.....#","#.....#","#S...S#","#.....#","#W#D#W#"],
-    // 7x7 — L-shape
     ["#######","#S....#","#.....#","#..####","#S..S.#","#.....#","#W#D#W#"],
-    // 7x7 — open plan
     ["#######","#.S.S.#","#.....#","#.....#","#.....#","#S...S#","##WDW##"],
-    // 7x8 — two-room
-    ["#######","#S...S#","#.....#","###.###","#S...S#","#.....#","#.....#","##WDW##"],
-    // 8x7 — wide house
+    ["#######","#S...S#","#.....#","###.###","#S...S#","#.....#","##WDW##"],
     ["########","#S....S#","#......#","#..SS..#","#......#","#S....S#","##W#DW##"],
   ],
+  house_basement: [
+    ["#######","#S...S#","#.....#","#.....#","#.....#","#S...S#","####U##"],
+    ["#######","#.....#","#.S.S.#","#.....#","#.....#","#.....#","####U##"],
+  ],
   store: [
-    // 9x7 — grid store
     ["#########","#.S.S.S.#","#.......#","#.S.S.S.#","#.......#","#.......#","####D####"],
-    // 9x7 — wall display
     ["#########","#S.....S#","#.......#","#.S.S.S.#","#.......#","#S.....S#","####D####"],
-    // 9x8 — big store
     ["#########","#S.S.S.S#","#.......#","#.......#","#S.S.S.S#","#.......#","#.......#","####D####"],
   ],
+  store_basement: [
+    ["#########","#S.....S#","#.......#","#.......#","#S.S.S.S#","#.......#","######U##"],
+  ],
   garage: [
-    // 7x6 — small bay
     ["#######","#S...S#","#.....#","#.....#","#..S..#","###D###"],
-    // 8x6 — double bay
     ["########","#S..S..#","#......#","#......#","#S....S#","###DD###"],
-    // 7x7 — with office
     ["#######","#S...S#","#.....#","###.###","#.....#","#S...S#","###D###"],
   ],
   clinic: [
-    // 7x7 — divided
     ["#######","#S...S#","#.....#","##.#.##","#S...S#","#.....#","##WDW##"],
-    // 8x7 — open clinic
     ["########","#S....S#","#......#","#.SS...#","#......#","#S....S#","###DW###"],
-    // 7x8 — two-wing
-    ["#######","#S...S#","#.....#","#..#..#","#.....#","#S...S#","#.....#","###D###"],
+    ["#######","#S...S#","#.....#","#..#..#","#.....#","#S...S#","###D###"],
   ],
   warehouse: [
-    // 10x7 — large open
     ["##########","#S..SS..S#","#........#","#........#","#S..SS..S#","#........#","####DD####"],
-    // 9x8 — rows
     ["#########","#S.S.S.S#","#.......#","#.......#","#.......#","#S.S.S.S#","#.......#","####D####"],
   ],
-  bunker: [
-    // 7x7 — underground shelter (ladder on bottom edge)
-    ["#######","#S...S#","#.....#","#.....#","#.....#","#S...S#","###L###"],
+  warehouse_upper: [
+    ["##########","#S......S#","#........#","#........#","#S......S#","#........#","U#########"],
+    ["#########","#S.....S#","#.......#","#.......#","#.......#","#.......#","U########"],
   ],
+  bunker: [
+    ["RRRRRRRRR","R.......R","R..S.S..R","R.......R","R.......R","R..S.S..R","R.......R","RRRRLRRRR"],
+  ],
+},
+
+/** Multi-floor config */
+multiFloor: {
+  house:     {extra:'house_basement',   chance:0.30, dir:'down', label:'Basement'},
+  store:     {extra:'store_basement',   chance:0.20, dir:'down', label:'Storage Cellar'},
+  warehouse: {extra:'warehouse_upper',  chance:0.35, dir:'up',   label:'Upper Floor'},
 },
 
 startItems: ['canned','canned','water_b','water_b','knife','bandage','bandage','hammer','nails','wood','wood','book_carp'],
 
 player: {hp:100, stm:100, food:80, h2o:80, maxWeight:15},
 
-/* ── Tuning Constants ────────────────────────────────────── */
 tuning: {
   baseVision:3, nightVisPen:1, moveCost:2, encumberedStamPen:2,
   scavengeCost:8, searchCost:5, salvageCost:5, scavengeChance:0.45,
@@ -210,12 +213,10 @@ worldGen: {
   cityCount:6, cityMinEdgeBuffer:5, cityCoreDist:2,
   citySuburbDist:5, citySuburbChance:0.4,
   terrainWaterThreshold:1.8, terrainForestThreshold:1.2,
-  // Building weights — city core
   coreDist: [
     {type:'house',weight:30},{type:'store',weight:20},{type:'garage',weight:15},
     {type:'clinic',weight:15},{type:'warehouse',weight:12},
   ],
-  // Building weights — suburb fringe
   suburbDist: [
     {type:'house',weight:65},{type:'garage',weight:18},{type:'clinic',weight:12},{type:'warehouse',weight:5},
   ],

@@ -53,7 +53,6 @@ const World = {
     while (y !== p2.y) { y += y < p2.y ? 1 : -1; pave(); }
   },
 
-  /** Weighted random pick from [{type,weight},...] */
   _wPick(pool) {
     let t = pool.reduce((s, e) => s + e.weight, 0), r = Math.random() * t;
     for (let e of pool) { r -= e.weight; if (r <= 0) return e.type; }
@@ -61,108 +60,163 @@ const World = {
   },
 
   _zone(map, w, h, cities, roads, wg) {
-    for (let y = 0; y < h; y++) {
+    for (let y = 0; y < h; y++)
       for (let x = 0; x < w; x++) {
         if (map[y][x].type === 'water' || roads.has(`${x},${y}`)) continue;
         let d = cities.reduce((m, c) => Math.min(m, Math.abs(c.x - x) + Math.abs(c.y - y)), Infinity);
-        if (d <= wg.cityCoreDist) {
-          map[y][x] = this.tile(this._wPick(wg.coreDist));
-        } else if (d <= wg.citySuburbDist && Math.random() < wg.citySuburbChance) {
+        if (d <= wg.cityCoreDist) map[y][x] = this.tile(this._wPick(wg.coreDist));
+        else if (d <= wg.citySuburbDist && Math.random() < wg.citySuburbChance)
           map[y][x] = this.tile(this._wPick(wg.suburbDist));
-        }
       }
-    }
   },
 };
 
 
 /* ═══════════════════════════════════════════════════════════
-   Interior Generation
+   Interior Generation — Multi-Floor Support
    ═══════════════════════════════════════════════════════════ */
 
 const Interior = {
 
-  /** Map of layout chars to interior tile types */
-  _charMap: {'#':'wall','.':'floor','D':'door','W':'window','S':'shelf','C':'counter','L':'ladder'},
+  _charMap:       {'#':'wall','.':'floor','D':'door','W':'window','S':'shelf','C':'counter','L':'ladder','U':'stairs_up','B':'stairs_down'},
+  _bunkerCharMap: {'R':'bwall','.':'bfloor','S':'shelf','L':'ladder','U':'stairs_up','B':'stairs_down'},
 
-  /** Generate an interior map for a building type */
+  /** Generate a multi-floor building interior */
   generate(buildingType) {
     let layoutKey = buildingType;
-    if (!C.layouts[layoutKey]) layoutKey = 'house'; // fallback
+    if (!C.layouts[layoutKey]) layoutKey = 'house';
     let templates = C.layouts[layoutKey];
     let tmpl = templates[Math.floor(Math.random() * templates.length)];
-    return this._buildInterior(tmpl, buildingType);
+    let groundFloor = this._buildFloor(tmpl, buildingType, 'Ground Floor');
+
+    let building = {
+      floors: [groundFloor],
+      buildingType,
+      cleared: false,
+    };
+
+    // Check for multi-floor
+    let mf = C.multiFloor[buildingType];
+    if (mf && Math.random() < mf.chance) {
+      let extraTemplates = C.layouts[mf.extra];
+      if (extraTemplates && extraTemplates.length > 0) {
+        let extraTmpl = extraTemplates[Math.floor(Math.random() * extraTemplates.length)];
+        let extraFloor = this._buildFloor(extraTmpl, buildingType, mf.label);
+
+        if (mf.dir === 'down') {
+          // Ground floor gets stairs_down, extra floor is below
+          this._addStairs(groundFloor, 'stairs_down');
+          building.floors.push(extraFloor);
+        } else {
+          // Ground floor gets stairs_up, extra floor is above
+          this._addStairs(groundFloor, 'stairs_up');
+          building.floors.push(extraFloor);
+        }
+      }
+    }
+
+    return building;
   },
 
-  /** Generate the starting bunker (pre-cleared, pre-claimed) */
+  /** Generate the starting bunker */
   generateBunker() {
     let tmpl = C.layouts.bunker[0];
-    let int = this._buildInterior(tmpl, 'bunker');
-    int.claimed = true;
-    int.cleared = true;
-    return int;
+    let floor = this._buildFloor(tmpl, 'bunker', 'Bunker');
+    return {
+      floors: [floor],
+      buildingType: 'bunker',
+      cleared: true,
+    };
   },
 
-  /** Build interior data from a template string array */
-  _buildInterior(tmpl, buildingType) {
+  /** Add a stairs tile to a random floor spot */
+  _addStairs(floor, stairType) {
+    // Find an open floor tile not adjacent to the entry
+    let candidates = [];
+    for (let y = 1; y < floor.h - 1; y++)
+      for (let x = 1; x < floor.w - 1; x++) {
+        if (floor.map[y][x].type !== 'floor') continue;
+        let dx = Math.abs(x - floor.entryPos.x), dy = Math.abs(y - floor.entryPos.y);
+        if (dx + dy > 2) candidates.push({ x, y });
+      }
+    if (candidates.length === 0) return;
+    let pick = candidates[Math.floor(Math.random() * candidates.length)];
+    floor.map[pick.y][pick.x].type = stairType;
+  },
+
+  /** Build a single floor from template */
+  _buildFloor(tmpl, buildingType, label) {
+    let isBunker = (buildingType === 'bunker');
+    let charMap = isBunker ? this._bunkerCharMap : this._charMap;
     let h = tmpl.length, w = tmpl[0].length;
-    let map = [], doorPos = null;
+    let map = [], entryPos = null;
 
     for (let y = 0; y < h; y++) {
       let row = [];
       for (let x = 0; x < w; x++) {
         let ch = tmpl[y][x];
-        let type = this._charMap[ch] || 'wall';
+        let type = charMap[ch] || (isBunker ? 'bwall' : 'wall');
         let cell = { type, loot: 0, barricadeHp: 0 };
         if (type === 'shelf') cell.loot = 3;
-        if (type === 'door' || type === 'ladder') doorPos = { x, y };
+        if (type === 'door' || type === 'ladder') entryPos = { x, y };
+        if (type === 'stairs_up') entryPos = entryPos || { x, y };
         row.push(cell);
       }
       map.push(row);
     }
 
-    // Safety: fallback entry
-    if (!doorPos) {
-      for (let y = 0; y < h && !doorPos; y++)
-        for (let x = 0; x < w && !doorPos; x++)
-          if (map[y][x].type === 'window' || map[y][x].type === 'floor')
-            doorPos = { x, y };
+    // Fallback entry
+    if (!entryPos) {
+      for (let y = 0; y < h && !entryPos; y++)
+        for (let x = 0; x < w && !entryPos; x++)
+          if (C.itiles[map[y][x].type] && C.itiles[map[y][x].type].pass)
+            entryPos = { x, y };
     }
 
-    return { map, w, h, doorPos, claimed: false, cleared: false, buildingType };
+    return { map, w, h, entryPos, label };
   },
 
-  /** Find searchable tiles adjacent to player position */
-  getAdjacentSearchable(interior, px, py) {
+  /** Get the current floor data from a building */
+  getFloor(building, floorIdx) {
+    return building.floors[floorIdx] || building.floors[0];
+  },
+
+  /** Find stairs position on a floor */
+  findStairs(floor, stairType) {
+    for (let y = 0; y < floor.h; y++)
+      for (let x = 0; x < floor.w; x++)
+        if (floor.map[y][x].type === stairType) return { x, y };
+    return null;
+  },
+
+  getAdjacentSearchable(floor, px, py) {
     let results = [];
     for (let [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
       let nx = px + dx, ny = py + dy;
-      if (nx < 0 || nx >= interior.w || ny < 0 || ny >= interior.h) continue;
-      let cell = interior.map[ny][nx], def = C.itiles[cell.type];
+      if (nx < 0 || nx >= floor.w || ny < 0 || ny >= floor.h) continue;
+      let cell = floor.map[ny][nx], def = C.itiles[cell.type];
       if (def && def.searchable && cell.loot > 0) results.push({ x: nx, y: ny, cell });
     }
     return results;
   },
 
-  /** Find barricadable tiles adjacent to player position */
-  getAdjacentBarricadable(interior, px, py) {
+  getAdjacentBarricadable(floor, px, py) {
     let results = [];
     for (let [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
       let nx = px + dx, ny = py + dy;
-      if (nx < 0 || nx >= interior.w || ny < 0 || ny >= interior.h) continue;
-      let cell = interior.map[ny][nx], def = C.itiles[cell.type];
+      if (nx < 0 || nx >= floor.w || ny < 0 || ny >= floor.h) continue;
+      let cell = floor.map[ny][nx], def = C.itiles[cell.type];
       if (def && def.barricadable && cell.barricadeHp <= 0) results.push({ x: nx, y: ny, cell });
     }
     return results;
   },
 
-  /** Find salvageable tiles adjacent to player position */
-  getAdjacentSalvageable(interior, px, py) {
+  getAdjacentSalvageable(floor, px, py) {
     let results = [];
     for (let [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
       let nx = px + dx, ny = py + dy;
-      if (nx < 0 || nx >= interior.w || ny < 0 || ny >= interior.h) continue;
-      let cell = interior.map[ny][nx], def = C.itiles[cell.type];
+      if (nx < 0 || nx >= floor.w || ny < 0 || ny >= floor.h) continue;
+      let cell = floor.map[ny][nx], def = C.itiles[cell.type];
       if (def && def.salvageable) results.push({ x: nx, y: ny, cell });
     }
     return results;
