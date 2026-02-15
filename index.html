@@ -5,15 +5,23 @@
 <script src="./player_system.js"></script>
 <script src="./inventory_system.js"></script>
 <script src="./combat_system.js"></script>
-<script src="./world_system.js"></script> <script src="./game.js"></script>
+<script src="./world_system.js"></script>
+<script src="./actions_system.js"></script>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Wasteland Survivor</title>
-<style>
+<script src="./game.js"></script>
+
+<script>
+window.onload = function() {
+  try { 
+    G = new Game(); 
+  } catch(e) {
+    console.error("Initialization Failed:", e);
+    document.getElementById('gameLog').innerHTML =
+      '<div class="le l-bad">Init error: ' + e.message + '</div>' +
+      '<div class="le" style="color:#666;font-size:10px">' + e.stack + '</div>';
+  }
+};
+</script>
   
 /* ═══════════════════════════════════════════════════════════
    VARIABLES & RESET
