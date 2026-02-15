@@ -72,8 +72,8 @@ const UI = {
     const c = document.getElementById('mapC');
     if (!c) return;
     c.innerHTML = '';
-    let rad = 4, size = rad * 2 + 1;
-    document.documentElement.style.setProperty('--tile', '36px');
+    let rad = C.display.mapViewRadius, size = rad * 2 + 1;
+    document.documentElement.style.setProperty('--tile', C.display.tileSize + 'px');
     c.className = 'mg';
     c.style.gridTemplateColumns = `repeat(${size},1fr)`;
     let zm = {};
@@ -95,30 +95,35 @@ const UI = {
     if (vis) {
       e.classList.add(def.css);
       e.innerText = this._tch(td, x, y);
-      if (td.loot <= 0 && def.cap > 0) e.classList.add('t-dep');
       let k = `${x},${y}`;
       if (zm[k] && !(x === g.p.x && y === g.p.y)) {
         let z = zm[k];
-        e.innerHTML = `<span class="zi">${C.enemies[z.type].icon}</span>`;
-        e.classList.add('t-zomb');
+        let zIcon = C.getIcon('e_' + z.type) || C.enemies[z.type].icon;
+        e.innerHTML = `<span class="zi">${zIcon}</span>`;
+        if (C.display.showZombieGlow) e.classList.add('t-zomb');
       }
     } else if (known) {
-      e.classList.add(def.css, 't-mem');
-      e.innerText = def.ch;
+      e.classList.add(def.css);
+      e.innerText = this._tch(td, x, y);
     } else {
-      e.classList.add('t-fog');
+      if (C.display.showFogOfWar) e.classList.add('t-fog');
+      else { e.style.background = '#000'; }
     }
     if (x === g.p.x && y === g.p.y) {
-      let ic = g.isEncumbered ? '😓' : '👤';
+      let ic = g.isEncumbered ? C.getIcon('player_tired') : C.getIcon('player');
       e.innerHTML += `<span class="pi">${ic}</span>`;
     }
     return e;
   },
 
   _tch(td, x, y) {
-    if (td.type === 'grass') return [',', '.', '`', '⁖'][(x + y) % 4];
-    if (td.type === 'forest') return ['🌲', '🌳', '↟'][(x * y) % 3];
-    return C.tiles[td.type].ch;
+    // Use icon system: random mode or variant tiles use coordinate-based picking
+    let iconEntry = C.icons[td.type];
+    if (iconEntry && C.display.enableTileVariants && iconEntry.random) {
+      if (td.type === 'forest') return iconEntry.random[(x * y) % iconEntry.random.length];
+      return iconEntry.random[(x + y) % iconEntry.random.length];
+    }
+    return C.getIcon(td.type, x, y);
   },
 
   /* ── Interior Rendering ────────────────────────────────── */
@@ -139,16 +144,16 @@ const UI = {
         let cell = int.map[y][x], def = C.itiles[cell.type];
         let e = document.createElement('div');
         e.className = 'tl ' + def.css;
-        e.innerText = def.ch;
-        if (cell.loot <= 0 && def.searchable) e.style.opacity = '.4';
+        e.innerText = C.getIcon(cell.type, x, y);
         if (cell.barricadeHp > 0) e.innerHTML += `<div class="it-barr"></div>`;
         let k = `${x},${y}`;
         if (zm[k] && !(x === g.p.x && y === g.p.y)) {
           let z = zm[k];
-          e.innerHTML = `<span class="zi">${C.enemies[z.type].icon}</span>`;
-          e.classList.add('t-zomb');
+          let zIcon = C.getIcon('e_' + z.type) || C.enemies[z.type].icon;
+          e.innerHTML = `<span class="zi">${zIcon}</span>`;
+          if (C.display.showZombieGlow) e.classList.add('t-zomb');
         }
-        if (x === g.p.x && y === g.p.y) e.innerHTML += `<span class="pi">👤</span>`;
+        if (x === g.p.x && y === g.p.y) e.innerHTML += `<span class="pi">${C.getIcon('player')}</span>`;
         c.appendChild(e);
       }
     }
@@ -167,7 +172,7 @@ const UI = {
   renderInspector(g) {
     if (g.location === 'interior') {
       let int = g.currentInterior, cell = int.map[g.p.y][g.p.x], def = C.itiles[cell.type];
-      document.getElementById('iIcon').innerText = def.ch;
+      document.getElementById('iIcon').innerText = C.getIcon(cell.type);
       let name = cell.type.charAt(0).toUpperCase() + cell.type.slice(1);
       if (cell.type === 'door' || cell.type === 'pdoor') name = 'Doorway';
       if (cell.type === 'window') name = 'Window';
@@ -195,13 +200,14 @@ const UI = {
       let containers = g.getAdjacentContainers();
       if (containers.length > 0) {
         let count = containers[0].cell.storage ? containers[0].cell.storage.length : 0;
-        tags += `<span class="tag tag-crate">CRATE${count > 0 ? ' ×' + count : ''}</span>`;
+        let cTypeName = containers[0].cell.type ? containers[0].cell.type.toUpperCase() : 'STORAGE';
+        tags += `<span class="tag tag-crate">${cTypeName}${count > 0 ? ' ×' + count : ''}</span>`;
       }
       document.getElementById('iTags').innerHTML = tags;
       return;
     }
     let cur = g.map[g.p.y][g.p.x], def = C.tiles[cur.type];
-    document.getElementById('iIcon').innerText = def.ch;
+    document.getElementById('iIcon').innerText = C.getIcon(cur.type);
     document.getElementById('iName').innerText = def.name;
     document.getElementById('iDesc').innerText = def.desc;
     let tags = '';
@@ -258,7 +264,12 @@ const UI = {
 
       // Container shortcut
       let containers = g.getAdjacentContainers();
-      if (containers.length > 0) html += `<button class="btn btn-a btn-crate" onclick="G.setTab('crate')">📦 OPEN STORAGE CRATE</button>`;
+      if (containers.length > 0) {
+        let cType = containers[0].cell.type;
+        let cLabel = cType ? cType.charAt(0).toUpperCase() + cType.slice(1) : 'Storage';
+        let cIcon = C.itiles[cType] ? C.itiles[cType].ch : '📦';
+        html += `<button class="btn btn-a btn-crate" onclick="G.setTab('crate')">${cIcon} OPEN ${cLabel.toUpperCase()}</button>`;
+      }
 
       if (onEntry) {
         let exitLabel = cell.type === 'ladder' ? '🪜 CLIMB OUT' : '🚪 EXIT BUILDING';
@@ -433,11 +444,13 @@ const UI = {
     if (!el) return;
     let containers = g.getAdjacentContainers();
     if (containers.length === 0) {
-      el.innerHTML = '<div style="padding:15px;color:#555;text-align:center">No storage crate nearby.</div>';
+      el.innerHTML = '<div style="padding:15px;color:#555;text-align:center">No storage container nearby.</div>';
       return;
     }
     let storage = containers[0].cell.storage || [];
-    let h = `<div style="padding:6px 10px;font-weight:bold;font-size:11px;border-bottom:1px solid #222;color:#888">Crate contents: ${storage.length}</div>`;
+    let cType = containers[0].cell.type;
+    let cLabel = cType ? cType.charAt(0).toUpperCase() + cType.slice(1) : 'Storage';
+    let h = `<div style="padding:6px 10px;font-weight:bold;font-size:11px;border-bottom:1px solid #222;color:#888">${cLabel} contents: ${storage.length}</div>`;
     // Store buttons — items from inv
     if (g.inv.length > 0) {
       h += `<div class="sl">STORE FROM INVENTORY</div>`;
@@ -452,14 +465,14 @@ const UI = {
     }
     // Retrieve buttons
     if (storage.length > 0) {
-      h += `<div class="sl">RETRIEVE FROM CRATE</div>`;
+      h += `<div class="sl">RETRIEVE FROM ${cLabel.toUpperCase()}</div>`;
       h += storage.map((si, idx) => {
         let d = C.items[si.id];
         let qStr = si.qty > 1 ? ` <span class="bs">×${si.qty}</span>` : '';
         return `<div class="ii"><div style="flex:1"><div style="color:#ccc">${d.icon} ${d.name}${qStr}</div></div><div><button class="ib ib-u" onclick="G.retrieveFromContainer(${idx})">TAKE</button></div></div>`;
       }).join('');
     } else if (g.inv.length === 0) {
-      h += '<div style="padding:10px;color:#555;text-align:center">Crate is empty.</div>';
+      h += `<div style="padding:10px;color:#555;text-align:center">${cLabel} is empty.</div>`;
     }
     el.innerHTML = h;
   },
