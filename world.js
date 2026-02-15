@@ -53,15 +53,23 @@ const World = {
     while (y !== p2.y) { y += y < p2.y ? 1 : -1; pave(); }
   },
 
+  /** Weighted random pick from [{type,weight},...] */
+  _wPick(pool) {
+    let t = pool.reduce((s, e) => s + e.weight, 0), r = Math.random() * t;
+    for (let e of pool) { r -= e.weight; if (r <= 0) return e.type; }
+    return pool[pool.length - 1].type;
+  },
+
   _zone(map, w, h, cities, roads, wg) {
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         if (map[y][x].type === 'water' || roads.has(`${x},${y}`)) continue;
         let d = cities.reduce((m, c) => Math.min(m, Math.abs(c.x - x) + Math.abs(c.y - y)), Infinity);
-        if (d <= wg.cityCoreDist)
-          map[y][x] = this.tile(Math.random() > (1 - wg.storeChance) ? 'store' : 'house');
-        else if (d <= wg.citySuburbDist && Math.random() < wg.citySuburbChance)
-          map[y][x] = this.tile('house');
+        if (d <= wg.cityCoreDist) {
+          map[y][x] = this.tile(this._wPick(wg.coreDist));
+        } else if (d <= wg.citySuburbDist && Math.random() < wg.citySuburbChance) {
+          map[y][x] = this.tile(this._wPick(wg.suburbDist));
+        }
       }
     }
   },
@@ -74,28 +82,46 @@ const World = {
 
 const Interior = {
 
-  /** Generate an interior map for a building type ('house' or 'store') */
+  /** Map of layout chars to interior tile types */
+  _charMap: {'#':'wall','.':'floor','D':'door','W':'window','S':'shelf','C':'counter','L':'ladder'},
+
+  /** Generate an interior map for a building type */
   generate(buildingType) {
-    let templates = C.layouts[buildingType === 'store' ? 'store' : 'house'];
+    let layoutKey = buildingType;
+    if (!C.layouts[layoutKey]) layoutKey = 'house'; // fallback
+    let templates = C.layouts[layoutKey];
     let tmpl = templates[Math.floor(Math.random() * templates.length)];
+    return this._buildInterior(tmpl, buildingType);
+  },
+
+  /** Generate the starting bunker (pre-cleared, pre-claimed) */
+  generateBunker() {
+    let tmpl = C.layouts.bunker[0];
+    let int = this._buildInterior(tmpl, 'bunker');
+    int.claimed = true;
+    int.cleared = true;
+    return int;
+  },
+
+  /** Build interior data from a template string array */
+  _buildInterior(tmpl, buildingType) {
     let h = tmpl.length, w = tmpl[0].length;
-    let map = [];
-    let doorPos = null;
+    let map = [], doorPos = null;
 
     for (let y = 0; y < h; y++) {
       let row = [];
       for (let x = 0; x < w; x++) {
         let ch = tmpl[y][x];
-        let type = { '#':'wall', '.':'floor', 'D':'door', 'W':'window', 'S':'shelf', 'C':'counter' }[ch] || 'wall';
+        let type = this._charMap[ch] || 'wall';
         let cell = { type, loot: 0, barricadeHp: 0 };
         if (type === 'shelf') cell.loot = 3;
-        if (type === 'door') doorPos = { x, y };
+        if (type === 'door' || type === 'ladder') doorPos = { x, y };
         row.push(cell);
       }
       map.push(row);
     }
 
-    // Safety: if no door found, use first window or floor
+    // Safety: fallback entry
     if (!doorPos) {
       for (let y = 0; y < h && !doorPos; y++)
         for (let x = 0; x < w && !doorPos; x++)
@@ -112,8 +138,7 @@ const Interior = {
     for (let [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
       let nx = px + dx, ny = py + dy;
       if (nx < 0 || nx >= interior.w || ny < 0 || ny >= interior.h) continue;
-      let cell = interior.map[ny][nx];
-      let def = C.itiles[cell.type];
+      let cell = interior.map[ny][nx], def = C.itiles[cell.type];
       if (def && def.searchable && cell.loot > 0) results.push({ x: nx, y: ny, cell });
     }
     return results;
@@ -125,9 +150,20 @@ const Interior = {
     for (let [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
       let nx = px + dx, ny = py + dy;
       if (nx < 0 || nx >= interior.w || ny < 0 || ny >= interior.h) continue;
-      let cell = interior.map[ny][nx];
-      let def = C.itiles[cell.type];
+      let cell = interior.map[ny][nx], def = C.itiles[cell.type];
       if (def && def.barricadable && cell.barricadeHp <= 0) results.push({ x: nx, y: ny, cell });
+    }
+    return results;
+  },
+
+  /** Find salvageable tiles adjacent to player position */
+  getAdjacentSalvageable(interior, px, py) {
+    let results = [];
+    for (let [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
+      let nx = px + dx, ny = py + dy;
+      if (nx < 0 || nx >= interior.w || ny < 0 || ny >= interior.h) continue;
+      let cell = interior.map[ny][nx], def = C.itiles[cell.type];
+      if (def && def.salvageable) results.push({ x: nx, y: ny, cell });
     }
     return results;
   },

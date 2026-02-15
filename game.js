@@ -12,6 +12,7 @@ class Game {
     this.inv = [];
     this.equip = { weapon: null, tool: null, body: null, feet: null, back: null };
     this.stats = { ...C.player };
+    this.prevStats = { ...C.player }; // for drain flash detection
     this.skills = {};
     this.visited = new Set();
     this.alive = true;
@@ -21,28 +22,39 @@ class Game {
     this._lastNight = -1;
 
     // Interior state
-    this.location = 'world';         // 'world' or 'interior'
-    this.worldPos = null;            // saved world position when inside
-    this.currentInterior = null;     // interior data reference
-    this.currentBuildingTile = null;  // world tile reference
-    this.interiorZombies = [];       // zombies inside current building
-
-    // Bedroll tracking — only one placed at a time
-    this.bedrollPos = null;          // {x, y} or null
+    this.location = 'world';
+    this.worldPos = null;
+    this.currentInterior = null;
+    this.currentBuildingTile = null;
+    this.interiorZombies = [];
 
     // Init starting skills
     for (let k in C.skills) {
       if (C.skills[k].start) this.skills[k] = { lvl: 1, xp: 0 };
     }
 
+    // Find start position, place camp, attach bunker
     this.p = this._findStart();
-    this.map[this.p.y][this.p.x] = World.tile('camp');
+    let campTile = World.tile('camp');
+    campTile.interior = Interior.generateBunker();
+    this.map[this.p.y][this.p.x] = campTile;
+
+    // Give starting items
     C.startItems.forEach(id => this.addItem(id));
     this._spawnZombies(C.tuning.initZombies);
+
+    // Start player INSIDE the bunker
+    this.worldPos = { x: this.p.x, y: this.p.y };
+    this.currentInterior = campTile.interior;
+    this.currentBuildingTile = campTile;
+    this.location = 'interior';
+    this.p = { x: campTile.interior.doorPos.x, y: campTile.interior.doorPos.y };
+
     this.reveal();
     UI.fullRender(this);
-    this.logMsg("Camp established. Search buildings for supplies.", "l-imp");
-    this.logMsg("Read the Carpentry book to learn barricading.", "l-imp");
+    this.logMsg("You wake in your bunker. Supplies are thin.", "l-imp");
+    this.logMsg("Use the ladder to reach the surface.", "l-imp");
+    this.logMsg("Read the Carpentry book to learn building.", "l-imp");
     this._initSwipe();
   }
 
@@ -102,7 +114,6 @@ class Game {
   }
 
   get isEncumbered() { return this.weight > this.maxWeight; }
-
   get day() { return Math.floor(this.turn / C.tuning.turnsPerDay) + 1; }
 
   get isNight() {
@@ -116,37 +127,9 @@ class Game {
 
 
   /* ══════════════════════════════════════════════════════════
-     REST TIER — determine what quality of rest is available
+     ZOMBIE HELPERS
      ══════════════════════════════════════════════════════════ */
 
-  /**
-   * Returns the best rest tier available at the player's current position.
-   * 'home'    = camp tile, claimed interior, or standing on claimed building in world
-   * 'bedroll' = on a bedroll tile in the world
-   * 'rough'   = anywhere passable on the world map
-   * null      = cannot rest (e.g. inside un-claimed building, or on water)
-   */
-  getRestTier() {
-    if (this.location === 'interior') {
-      if (this.currentInterior && this.currentInterior.claimed) return 'home';
-      return null; // can't rough-rest indoors
-    }
-    // World map
-    let tile = this.map[this.p.y][this.p.x];
-    if (tile.type === 'camp') return 'home';
-    if ((tile.type === 'house' || tile.type === 'store') && tile.interior && tile.interior.claimed) return 'home';
-    if (tile.type === 'bedroll') return 'bedroll';
-    // Can rough-rest on any passable outdoor tile
-    if (C.tiles[tile.type] && C.tiles[tile.type].pass) return 'rough';
-    return null;
-  }
-
-
-  /* ══════════════════════════════════════════════════════════
-     ZOMBIE HELPERS — used by UI for action buttons & moodles
-     ══════════════════════════════════════════════════════════ */
-
-  /** Get zombies adjacent to player on world map (4-directional) */
   getAdjacentZombies() {
     if (this.location !== 'world') return [];
     let adj = [];
@@ -157,7 +140,6 @@ class Game {
     return adj;
   }
 
-  /** Get zombies adjacent to player inside building */
   getAdjacentInteriorZombies() {
     if (this.location !== 'interior') return [];
     let adj = [];
@@ -168,7 +150,6 @@ class Game {
     return adj;
   }
 
-  /** Count zombies within vision range */
   getNearbyZombieCount() {
     let count = 0;
     for (let z of this.zombies) {
@@ -179,7 +160,7 @@ class Game {
 
 
   /* ══════════════════════════════════════════════════════════
-     CORE TICK — hunger, thirst, starvation, zombie AI
+     CORE TICK
      ══════════════════════════════════════════════════════════ */
 
   tick() {
@@ -187,20 +168,16 @@ class Game {
     this.turn++;
     const t = C.tuning;
 
-    // Drain
     this.stats.food = Math.max(0, this.stats.food - t.tickHunger);
     this.stats.h2o = Math.max(0, this.stats.h2o - t.tickThirst);
 
-    // Starvation/dehydration damage
     if (this.stats.food <= 0 || this.stats.h2o <= 0) {
       this.stats.hp = Math.max(0, this.stats.hp - t.starveDmg);
       if (this.stats.hp <= 0) return this._die("Wasted away in the wasteland.");
     }
 
-    // Zombie movement — each zombie moves on its own speed schedule
     if (this.location === 'world') this._moveZombies();
 
-    // Night spawns
     let cd = this.day;
     if (this.isNight && this._lastNight < cd) {
       this._lastNight = cd;
@@ -212,7 +189,7 @@ class Game {
 
 
   /* ══════════════════════════════════════════════════════════
-     MOVEMENT — world & interior
+     MOVEMENT
      ══════════════════════════════════════════════════════════ */
 
   move(dx, dy) {
@@ -228,16 +205,10 @@ class Game {
     let tile = this.map[ny][nx], td = C.tiles[tile.type];
     if (!td.pass) return this.logMsg("Blocked.", "l-bad");
 
-    // ── COMBAT: Moving into a zombie = ATTACK (stay in place) ──
     let targetZ = this.zombies.find(z => z.x === nx && z.y === ny);
-    if (targetZ) {
-      this._playerAttack(targetZ, false);
-      return;
-    }
+    if (targetZ) { this._playerAttack(targetZ, false); return; }
 
-    // Normal movement
-    this.p.x = nx;
-    this.p.y = ny;
+    this.p.x = nx; this.p.y = ny;
     this.stats.stm -= cost;
     this._degradeSlot('feet', 0.2);
     this.tick();
@@ -256,15 +227,10 @@ class Game {
     let cell = int.map[ny][nx], def = C.itiles[cell.type];
     if (!def.pass) return;
 
-    // ── COMBAT: Moving into interior zombie = ATTACK (stay in place) ──
     let targetZ = this.interiorZombies.find(z => z.x === nx && z.y === ny);
-    if (targetZ) {
-      this._playerAttack(targetZ, true);
-      return;
-    }
+    if (targetZ) { this._playerAttack(targetZ, true); return; }
 
-    this.p.x = nx;
-    this.p.y = ny;
+    this.p.x = nx; this.p.y = ny;
     this.stats.stm -= cost;
     this.tick();
     UI.fullRender(this);
@@ -272,15 +238,9 @@ class Game {
 
 
   /* ══════════════════════════════════════════════════════════
-     COMBAT — clear attack-in-place system
+     COMBAT
      ══════════════════════════════════════════════════════════ */
 
-  /**
-   * Explicit attack action (called from ATTACK buttons or from movement)
-   * @param {number} zx - zombie x position
-   * @param {number} zy - zombie y position
-   * @param {boolean} isInterior - whether combat is inside a building
-   */
   attackZombie(zx, zy, isInterior) {
     if (!this.alive) return;
     let zombieList = isInterior ? this.interiorZombies : this.zombies;
@@ -289,47 +249,30 @@ class Game {
     this._playerAttack(z, isInterior);
   }
 
-  /**
-   * Player attacks a zombie (stays in place). Zombie retaliates if alive.
-   */
   _playerAttack(zombie, isInterior) {
     let ed = C.enemies[zombie.type];
-
-    // Player strikes
     let pDmg = Math.max(1, this.attack - ed.def);
     zombie.hp -= pDmg;
     this._degradeSlot('weapon', C.tuning.durWeapon);
 
     if (zombie.hp <= 0) {
-      // Zombie killed
       if (isInterior) this.interiorZombies = this.interiorZombies.filter(z => z !== zombie);
       else this.zombies = this.zombies.filter(z => z !== zombie);
       this.kills++;
       this.gainXp('combat', ed.xp);
       this.logMsg(`⚔️ Hit ${ed.icon} ${ed.name} for ${pDmg} — KILLED! (+${ed.xp}xp)`, "l-combat");
-      this.tick();
-      UI.fullRender(this);
-      return;
+      this.tick(); UI.fullRender(this); return;
     }
 
-    // Zombie retaliates
     let eDmg = Math.max(1, ed.atk - this.defense);
     this.stats.hp -= eDmg;
     this._degradeSlot('body', C.tuning.durArmor);
     this.logMsg(`⚔️ Hit ${ed.icon} ${ed.name} for ${pDmg} (${zombie.hp}/${zombie.maxHp}) — it hits back for ${eDmg}!`, "l-combat");
 
-    if (this.stats.hp <= 0) {
-      this._die(`Killed by a ${ed.name}.`);
-      return;
-    }
-
-    this.tick();
-    UI.fullRender(this);
+    if (this.stats.hp <= 0) { this._die(`Killed by a ${ed.name}.`); return; }
+    this.tick(); UI.fullRender(this);
   }
 
-  /**
-   * Zombie attacks player (zombie initiated — ambush, gets first strike)
-   */
   _zombieAmbush(zombie, isInterior) {
     let ed = C.enemies[zombie.type];
     let eDmg = Math.max(1, ed.atk - this.defense);
@@ -337,12 +280,8 @@ class Game {
     this._degradeSlot('body', C.tuning.durArmor);
     this.logMsg(`${ed.icon} ${ed.name} lunges at you for ${eDmg} damage!`, "l-bad");
 
-    if (this.stats.hp <= 0) {
-      this._die(`Ambushed and killed by a ${ed.name}.`);
-      return;
-    }
+    if (this.stats.hp <= 0) { this._die(`Ambushed and killed by a ${ed.name}.`); return; }
 
-    // Player retaliates
     let pDmg = Math.max(1, this.attack - ed.def);
     zombie.hp -= pDmg;
     this._degradeSlot('weapon', C.tuning.durWeapon);
@@ -360,16 +299,15 @@ class Game {
 
 
   /* ══════════════════════════════════════════════════════════
-     ZOMBIE AI — spawning & movement
+     ZOMBIE AI
      ══════════════════════════════════════════════════════════ */
 
   _spawnZombies(count) {
     const t = C.tuning;
     let spawned = 0, attempts = 0;
     while (spawned < count && this.zombies.length < t.maxZombies && attempts++ < 200) {
-      let x = Math.floor(Math.random() * C.w);
-      let y = Math.floor(Math.random() * C.h);
-      if (Math.abs(x - this.p.x) + Math.abs(y - this.p.y) < t.zombieSpawnBuf) continue;
+      let x = Math.floor(Math.random() * C.w), y = Math.floor(Math.random() * C.h);
+      if (Math.abs(x - (this.worldPos || this.p).x) + Math.abs(y - (this.worldPos || this.p).y) < t.zombieSpawnBuf) continue;
       let tile = this.map[y][x];
       if (!C.tiles[tile.type].pass) continue;
       if (this.zombies.some(z => z.x === x && z.y === y)) continue;
@@ -380,15 +318,11 @@ class Game {
     }
   }
 
-  /**
-   * Move zombies — each moves on its own speed timer.
-   */
   _moveZombies() {
     const t = C.tuning;
     let list = [...this.zombies];
     for (let z of list) {
       if (!this.zombies.includes(z)) continue;
-
       let ed = C.enemies[z.type];
       if (this.turn % ed.speed !== 0) continue;
 
@@ -396,13 +330,10 @@ class Game {
       let dx = 0, dy = 0;
 
       if (dist <= t.zombieAggro && this.location === 'world') {
-        dx = Math.sign(this.p.x - z.x);
-        dy = Math.sign(this.p.y - z.y);
-        if (dx !== 0 && dy !== 0) {
-          if (Math.random() < .5) dx = 0; else dy = 0;
-        }
+        dx = Math.sign(this.p.x - z.x); dy = Math.sign(this.p.y - z.y);
+        if (dx !== 0 && dy !== 0) { if (Math.random() < .5) dx = 0; else dy = 0; }
       } else {
-        let dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+        let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
         let pick = dirs[Math.floor(Math.random() * dirs.length)];
         dx = pick[0]; dy = pick[1];
       }
@@ -419,15 +350,13 @@ class Game {
         if (this.zombies.includes(z)) { z.x -= dx; z.y -= dy; }
         continue;
       }
-
-      z.x = nx;
-      z.y = ny;
+      z.x = nx; z.y = ny;
     }
   }
 
 
   /* ══════════════════════════════════════════════════════════
-     ACTIONS — scavenge, enter/exit, search, barricade, rest
+     ACTIONS — scavenge, enter/exit, search, barricade, salvage
      ══════════════════════════════════════════════════════════ */
 
   scavenge() {
@@ -450,20 +379,19 @@ class Game {
       this.logMsg("Searched but found nothing.");
       this.gainXp('survival', 2);
     }
-    this.tick();
-    UI.fullRender(this);
+    this.tick(); UI.fullRender(this);
   }
 
   enterBuilding() {
     if (!this.alive || this.location !== 'world') return;
     let tile = this.map[this.p.y][this.p.x];
-    if (tile.type !== 'house' && tile.type !== 'store') return;
+    let td = C.tiles[tile.type];
+    if (!td.enter) return;
 
-    // Generate interior on first visit
+    // Generate interior on first visit (bunker already has one)
     if (!tile.interior) tile.interior = Interior.generate(tile.type);
     let int = tile.interior;
 
-    // Save world state
     this.worldPos = { x: this.p.x, y: this.p.y };
     this.currentInterior = int;
     this.currentBuildingTile = tile;
@@ -499,9 +427,9 @@ class Game {
           this.logMsg(`⚠️ Something is in here!`, "l-bad");
       }
     }
-    this.logMsg(`Entered ${tile.type === 'store' ? 'store' : 'house'}.`, "l-imp");
-    this.tick();
-    UI.fullRender(this);
+    let name = td.buildName || tile.type;
+    this.logMsg(`Entered ${name.toLowerCase()}.`, "l-imp");
+    this.tick(); UI.fullRender(this);
   }
 
   exitBuilding() {
@@ -509,16 +437,15 @@ class Game {
     let int = this.currentInterior;
     let cell = int.map[this.p.y][this.p.x];
     if (!C.itiles[cell.type].entry)
-      return this.logMsg("Move to a door or window to exit.", "l-bad");
+      return this.logMsg("Move to a door, window, or ladder to exit.", "l-bad");
     if (this.interiorZombies.length === 0) int.cleared = true;
     this.location = 'world';
     this.p = { ...this.worldPos };
     this.currentInterior = null;
     this.currentBuildingTile = null;
     this.interiorZombies = [];
-    this.logMsg("Exited building.", "l-imp");
-    this.reveal();
-    UI.fullRender(this);
+    this.logMsg("Exited to the surface.", "l-imp");
+    this.reveal(); UI.fullRender(this);
   }
 
   searchInterior() {
@@ -533,7 +460,8 @@ class Game {
     let sv = this.skills.survival ? this.skills.survival.lvl : 0;
     let ch = 0.6 + (sv * 0.05);
     this._degradeSlot('tool', t.durTool);
-    let poolName = int.buildingType === 'store' ? 'shelf_store' : 'shelf_house';
+    let poolName = 'shelf_' + int.buildingType;
+    if (!C.lootPools[poolName]) poolName = 'shelf_house';
     if (Math.random() < ch) {
       let id = this._wPick(C.lootPools[poolName]);
       this.addItem(id);
@@ -544,8 +472,7 @@ class Game {
       this.logMsg("Rummaged but found nothing useful.");
       this.gainXp('survival', 3);
     }
-    this.tick();
-    UI.fullRender(this);
+    this.tick(); UI.fullRender(this);
   }
 
   barricade() {
@@ -563,8 +490,36 @@ class Game {
     this.gainXp('carpentry', 25);
     this._degradeSlot('tool', C.tuning.durTool);
     this.logMsg("Barricaded the opening.", "l-good");
-    this.tick();
-    UI.fullRender(this);
+    this.tick(); UI.fullRender(this);
+  }
+
+  /** Salvage adjacent furniture for materials */
+  salvage() {
+    if (!this.alive || this.location !== 'interior') return;
+    let t = C.tuning;
+    if (this.stats.stm < t.salvageCost) return this.logMsg("Too tired.", "l-bad");
+    let int = this.currentInterior;
+    let targets = Interior.getAdjacentSalvageable(int, this.p.x, this.p.y);
+    if (targets.length === 0) return this.logMsg("Nothing to salvage nearby.", "l-bad");
+
+    this.stats.stm -= t.salvageCost;
+    let target = targets[0];
+    let yields = C.salvageYields[target.cell.type];
+
+    if (yields) {
+      for (let y of yields) {
+        let qty = y.qty != null ? y.qty : (y.min + Math.floor(Math.random() * (y.max - y.min + 1)));
+        if (qty > 0) this.addItem(y.id, qty);
+      }
+    }
+    let oldName = target.cell.type.charAt(0).toUpperCase() + target.cell.type.slice(1);
+    target.cell.type = 'floor';
+    target.cell.loot = 0;
+    target.cell.barricadeHp = 0;
+    this.gainXp('survival', 10);
+    this._degradeSlot('tool', C.tuning.durTool);
+    this.logMsg(`Salvaged ${oldName} for materials.`, "l-good");
+    this.tick(); UI.fullRender(this);
   }
 
   claimBuilding() {
@@ -573,196 +528,121 @@ class Game {
     if (int.claimed) return this.logMsg("Already claimed!", "l-bad");
     int.claimed = true;
     this.logMsg("Claimed this building as your home!", "l-imp");
-    this.logMsg("You can now rest safely here.", "l-good");
+    this.logMsg("You can now rest here for the best recovery.", "l-good");
     UI.fullRender(this);
   }
 
 
   /* ══════════════════════════════════════════════════════════
-     REST — Tiered system (rough → bedroll → home)
+     REST SYSTEM
      ══════════════════════════════════════════════════════════ */
+
+  getRestTier() {
+    if (this.location === 'interior') {
+      if (this.currentInterior && this.currentInterior.claimed) return 'home';
+      return null;
+    }
+    let tile = this.map[this.p.y][this.p.x];
+    if (tile.type === 'camp') return 'camp';
+    if (tile.type === 'shelter') return 'shelter';
+    if (tile.type === 'bedroll') return 'bedroll';
+    if (C.tiles[tile.type].enter && tile.interior && tile.interior.claimed) return 'camp';
+    if (C.tiles[tile.type].pass) return 'rough';
+    return null;
+  }
 
   rest() {
     if (!this.alive) return;
-    const t = C.tuning;
     let tier = this.getRestTier();
+    if (!tier) return this.logMsg("Can't rest here.", "l-bad");
+    let r = C.restTiers[tier];
+    if (!r) return;
 
-    if (!tier) {
-      return this.logMsg("Can't rest here. Try outside or find shelter.", "l-bad");
-    }
+    if (this.stats.food < r.food) return this.logMsg(`Need at least ${r.food} food to rest.`, "l-bad");
+    if (this.stats.h2o < r.water) return this.logMsg(`Need at least ${r.water} water to rest.`, "l-bad");
 
-    // Check adjacent zombies — can't rest with zombies right next to you
-    let adjZ = this.location === 'interior'
-      ? this.getAdjacentInteriorZombies()
-      : this.getAdjacentZombies();
-    if (adjZ.length > 0) {
-      return this.logMsg("Can't rest — zombies too close!", "l-bad");
-    }
+    if (tier === 'rough' && this.getAdjacentZombies().length > 0)
+      return this.logMsg("Too dangerous! Zombies are right next to you.", "l-bad");
 
-    let foodCost, waterCost, stmRestore, hpRestore, ticks, ambushChance;
+    this.stats.food -= r.food;
+    this.stats.h2o -= r.water;
+    this.stats.stm = Math.min(100, r.stm);
+    this.stats.hp = Math.min(100, this.stats.hp + r.hp);
 
-    if (tier === 'home') {
-      foodCost = t.restFoodCost;
-      waterCost = t.restWaterCost;
-      stmRestore = t.restStmRestore;
-      hpRestore = t.restHpRestore;
-      ticks = t.restTicks;
-      ambushChance = 0;
-    } else if (tier === 'bedroll') {
-      foodCost = t.bedrollFoodCost;
-      waterCost = t.bedrollWaterCost;
-      stmRestore = t.bedrollStmRestore;
-      hpRestore = t.bedrollHpRestore;
-      ticks = t.bedrollTicks;
-      ambushChance = t.bedrollAmbushChance;
-    } else {
-      // rough
-      foodCost = t.roughFoodCost;
-      waterCost = t.roughWaterCost;
-      stmRestore = t.roughStmRestore;
-      hpRestore = t.roughHpRestore;
-      ticks = t.roughTicks;
-      ambushChance = t.roughAmbushChance;
-    }
+    let msg = r.msg[Math.floor(Math.random() * r.msg.length)];
+    this.logMsg(msg, "l-good");
+    if (tier === 'rough') this.logMsg("Craft a Bedroll for better rest anywhere.", "l-imp");
 
-    if (this.stats.food < foodCost || this.stats.h2o < waterCost) {
-      return this.logMsg(`Need ${foodCost} food & ${waterCost} water to rest.`, "l-bad");
-    }
-
-    this.stats.food -= foodCost;
-    this.stats.h2o -= waterCost;
-
-    // Check for ambush interruption (rough & bedroll only)
-    if (ambushChance > 0 && Math.random() < ambushChance) {
-      // Interrupted! Partial rest only
-      this.stats.stm = Math.min(100, this.stats.stm + Math.floor(stmRestore * 0.3));
-      this.logMsg("⚠️ Woken by sounds in the dark!", "l-bad");
-
-      // Spawn a zombie nearby
-      let spawned = false;
-      for (let a = 0; a < 50 && !spawned; a++) {
-        let dirs = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
-        let dir = dirs[Math.floor(Math.random() * dirs.length)];
-        let sx = this.p.x + dir[0], sy = this.p.y + dir[1];
-        if (sx >= 0 && sx < C.w && sy >= 0 && sy < C.h) {
-          let st = this.map[sy][sx];
-          if (C.tiles[st.type].pass && !this.zombies.some(z => z.x === sx && z.y === sy)) {
-            let tid = this._wPick(C.zombieSpawns.filter(s => s.id !== 'brute'));
-            let ed = C.enemies[tid];
-            this.zombies.push({ x: sx, y: sy, type: tid, hp: ed.hp, maxHp: ed.hp });
-            this.logMsg(`${ed.icon} ${ed.name} appeared nearby!`, "l-bad");
-            spawned = true;
-          }
-        }
-      }
-
-      for (let i = 0; i < 2; i++) this.tick();
-      UI.fullRender(this);
-      return;
-    }
-
-    // Successful rest
-    this.stats.stm = Math.min(100, this.stats.stm + stmRestore);
-    this.stats.hp = Math.min(100, this.stats.hp + hpRestore);
-
-    if (tier === 'home') {
-      this.logMsg("Rested well. Stamina restored, wounds healing.", "l-good");
-    } else if (tier === 'bedroll') {
-      this.logMsg("Slept in your bedroll. Decent rest.", "l-good");
-    } else {
-      this.logMsg("Slept rough on the ground. Stiff but rested.", "l-imp");
-    }
-
-    for (let i = 0; i < ticks; i++) this.tick();
+    for (let i = 0; i < r.ticks; i++) this.tick();
     UI.fullRender(this);
   }
-
-
-  /* ══════════════════════════════════════════════════════════
-     BEDROLL PLACEMENT — open-world camp system
-     ══════════════════════════════════════════════════════════ */
-
-  /**
-   * Check if the player has a placeable bedroll in inventory
-   */
-  hasBedrollItem() {
-    return this.inv.some(i => C.items[i.id].type === 'place' && C.items[i.id].placeTile === 'bedroll');
-  }
-
-  /**
-   * Check if the current world tile allows bedroll placement
-   */
-  canPlaceBedroll() {
-    if (this.location !== 'world') return false;
-    let tile = this.map[this.p.y][this.p.x];
-    // Can place on grass, forest, road — not on buildings, water, camp, or existing bedroll
-    let allowed = ['grass', 'forest', 'road'];
-    return allowed.includes(tile.type) && this.hasBedrollItem();
-  }
-
-  /**
-   * Place bedroll at current position. Removes old bedroll if one exists.
-   */
-  placeBedroll() {
-    if (!this.alive || !this.canPlaceBedroll()) return;
-
-    // Remove old bedroll from map if one exists
-    if (this.bedrollPos) {
-      let old = this.map[this.bedrollPos.y][this.bedrollPos.x];
-      if (old.type === 'bedroll') {
-        // Restore original terrain type (default to grass)
-        this.map[this.bedrollPos.y][this.bedrollPos.x] = World.tile(old._originalType || 'grass');
-      }
-      this.logMsg("Picked up your old bedroll.", "l-imp");
-    }
-
-    // Remember original terrain type before converting
-    let currentTile = this.map[this.p.y][this.p.x];
-    let origType = currentTile.type;
-
-    // Remove bedroll kit from inventory
-    let bIdx = this.inv.findIndex(i => C.items[i.id].type === 'place' && C.items[i.id].placeTile === 'bedroll');
-    if (bIdx === -1) return;
-    let bItem = this.inv[bIdx];
-    bItem.qty--;
-    if (bItem.qty <= 0) this.inv.splice(bIdx, 1);
-
-    // Place bedroll tile
-    let newTile = World.tile('bedroll');
-    newTile._originalType = origType;
-    this.map[this.p.y][this.p.x] = newTile;
-    this.bedrollPos = { x: this.p.x, y: this.p.y };
-
-    this.gainXp('survival', 5);
-    this.logMsg("Laid out your bedroll. You can rest here now.", "l-good");
-    this.tick();
-    UI.fullRender(this);
-  }
-
-  /**
-   * Pick up bedroll from current position, returning it to inventory.
-   */
-  pickupBedroll() {
-    if (!this.alive || this.location !== 'world') return;
-    let tile = this.map[this.p.y][this.p.x];
-    if (tile.type !== 'bedroll') return;
-
-    // Restore original terrain
-    this.map[this.p.y][this.p.x] = World.tile(tile._originalType || 'grass');
-    this.bedrollPos = null;
-
-    // Return bedroll to inventory
-    this.addItem('bedroll_k', 1);
-    this.logMsg("Packed up your bedroll.", "l-imp");
-    UI.fullRender(this);
-  }
-
 
   wait() {
     if (!this.alive) return;
     this.logMsg("Waiting...");
-    this.tick();
-    UI.fullRender(this);
+    this.tick(); UI.fullRender(this);
+  }
+
+
+  /* ══════════════════════════════════════════════════════════
+     STRUCTURE PLACEMENT — world & interior
+     ══════════════════════════════════════════════════════════ */
+
+  placeStructure(itemId) {
+    if (!this.alive || this.location !== 'world') return;
+    let d = C.items[itemId];
+    if (!d || d.type !== 'place') return;
+    let idx = this.inv.findIndex(i => i.id === itemId);
+    if (idx === -1) return this.logMsg(`You don't have a ${d.name}.`, "l-bad");
+
+    let tile = this.map[this.p.y][this.p.x], td = C.tiles[tile.type];
+    if (!td.placeable) return this.logMsg("Can't place that here.", "l-bad");
+    if (tile.type === 'bedroll' || tile.type === 'shelter' || tile.type === 'camp')
+      return this.logMsg("Already a structure here.", "l-bad");
+
+    this.map[this.p.y][this.p.x] = World.tile(d.placeType);
+    let item = this.inv[idx];
+    item.qty--; if (item.qty <= 0) this.inv.splice(idx, 1);
+
+    let tileDef = C.tiles[d.placeType];
+    this.logMsg(`Placed ${tileDef.name}. ${tileDef.desc}`, "l-imp");
+    this.gainXp('survival', 20);
+    this.tick(); UI.fullRender(this);
+  }
+
+  /** Place a wall/door frame on current floor tile inside a building */
+  placeInterior(itemId) {
+    if (!this.alive || this.location !== 'interior') return;
+    let d = C.items[itemId];
+    if (!d || d.type !== 'iplace') return;
+    let idx = this.inv.findIndex(i => i.id === itemId);
+    if (idx === -1) return this.logMsg(`You don't have a ${d.name}.`, "l-bad");
+
+    let int = this.currentInterior;
+    let cell = int.map[this.p.y][this.p.x];
+    if (cell.type !== 'floor') return this.logMsg("Can only place on open floor.", "l-bad");
+
+    cell.type = d.placeType;
+    cell.barricadeHp = 0;
+    cell.loot = 0;
+
+    let item = this.inv[idx];
+    item.qty--; if (item.qty <= 0) this.inv.splice(idx, 1);
+
+    this.logMsg(`Placed ${d.name}.`, "l-good");
+    this.gainXp('carpentry', 15);
+
+    // If we placed a wall under ourselves, step to adjacent floor
+    if (!C.itiles[d.placeType].pass) {
+      let moved = false;
+      for (let [ddx, ddy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
+        let nx = this.p.x + ddx, ny = this.p.y + ddy;
+        if (nx >= 0 && nx < int.w && ny >= 0 && ny < int.h && C.itiles[int.map[ny][nx].type].pass) {
+          this.p.x = nx; this.p.y = ny; moved = true; break;
+        }
+      }
+    }
+    this.tick(); UI.fullRender(this);
   }
 
 
@@ -788,15 +668,14 @@ class Game {
         return this.logMsg(`Need ${r.inputs[m]} ${C.items[m].name}.`, "l-bad");
     }
     for (let m in r.inputs) this.removeItem(m, r.inputs[m]);
-    if (r.result.type === 'item') {
-      this.addItem(r.result.id, r.result.count || 1);
-      this.logMsg(`Crafted ${r.name}.`, "l-good");
-    } else if (r.result.type === 'barricade') {
-      this.logMsg(`Prepared barricade materials.`, "l-good");
-    }
+
+    this.addItem(r.result.id, r.result.count || 1);
+    let ri = C.items[r.result.id];
+    this.logMsg(`Crafted ${ri.icon} ${r.name}.`, "l-good");
+    this._lastCraftKey = key; // for UI flash
+
     this._degradeSlot('tool', C.tuning.durTool);
-    this.tick();
-    UI.fullRender(this);
+    this.tick(); UI.fullRender(this);
   }
 
 
@@ -811,7 +690,7 @@ class Game {
       if (ex) {
         let t = Math.min(qty, d.stack - ex.qty);
         ex.qty += t; qty -= t;
-        if (qty <= 0) { UI.renderInventory(this); return; }
+        if (qty <= 0) { UI.renderInventory(this); UI.flashTab('inv'); return; }
       }
     }
     while (qty > 0) {
@@ -823,6 +702,7 @@ class Game {
       qty -= a;
     }
     UI.renderInventory(this);
+    UI.flashTab('inv');
   }
 
   countItem(id) { return this.inv.reduce((s, i) => s + (i.id === id ? i.qty : 0), 0); }
@@ -855,15 +735,14 @@ class Game {
       if (!this.skills[d.skill]) {
         this.skills[d.skill] = { lvl: 1, xp: 0 };
         this.logMsg(`LEARNED: ${C.skills[d.skill].name}!`, "l-imp");
-        this.logMsg("You can now barricade doors & windows.", "l-good");
+        this.logMsg("You can now build walls, doors & barricades.", "l-good");
       } else {
         this.gainXp(d.skill, d.xp);
         this.logMsg(`Studied ${d.name}.`, "l-imp");
       }
       this.inv.splice(idx, 1);
     }
-    this.tick();
-    UI.fullRender(this);
+    this.tick(); UI.fullRender(this);
   }
 
   equipItem(uid) {
@@ -875,16 +754,14 @@ class Game {
     this.equip[slot] = item;
     this.inv.splice(idx, 1);
     this.logMsg(`Equipped ${C.items[item.id].icon} ${C.items[item.id].name}.`);
-    this.reveal();
-    UI.fullRender(this);
+    this.reveal(); UI.fullRender(this);
   }
 
   unequip(slot) {
     if (!this.equip[slot]) return;
     this.inv.push(this.equip[slot]);
     this.equip[slot] = null;
-    this.reveal();
-    UI.fullRender(this);
+    this.reveal(); UI.fullRender(this);
   }
 
   dropItem(uid) {
@@ -911,10 +788,7 @@ class Game {
     let s = this.skills[sk];
     s.xp += amt;
     let req = s.lvl * 100;
-    if (s.xp >= req) {
-      s.lvl++; s.xp -= req;
-      this.logMsg(`LEVEL UP! ${C.skills[sk].name} → ${s.lvl}`, "l-imp");
-    }
+    if (s.xp >= req) { s.lvl++; s.xp -= req; this.logMsg(`LEVEL UP! ${C.skills[sk].name} → ${s.lvl}`, "l-imp"); }
   }
 
   _degradeSlot(slot, amt) {
@@ -928,17 +802,8 @@ class Game {
     }
   }
 
-  _die(reason) {
-    this.alive = false;
-    this.logMsg(reason, "l-bad");
-    UI.fullRender(this);
-    UI.showDeath(this);
-  }
-
-  restart() {
-    UI.hideDeath();
-    G = new Game();
-  }
+  _die(reason) { this.alive = false; this.logMsg(reason, "l-bad"); UI.fullRender(this); UI.showDeath(this); }
+  restart() { UI.hideDeath(); G = new Game(); }
 
 
   /* ══════════════════════════════════════════════════════════
@@ -964,32 +829,24 @@ class Game {
   }
 
   reveal() {
-    let r = this.vision;
+    let r = this.vision, px = this.worldPos ? this.worldPos.x : this.p.x, py = this.worldPos ? this.worldPos.y : this.p.y;
     for (let dy = -r; dy <= r; dy++)
       for (let dx = -r; dx <= r; dx++) {
-        let nx = this.p.x + dx, ny = this.p.y + dy;
+        let nx = px + dx, ny = py + dy;
         if (nx >= 0 && nx < C.w && ny >= 0 && ny < C.h) this.visited.add(`${nx},${ny}`);
       }
   }
 
-  logMsg(text, cls = '') {
-    this.log.unshift({ m: text, c: cls });
-    UI.renderLog(this);
-  }
+  logMsg(text, cls = '') { this.log.unshift({ m: text, c: cls }); UI.renderLog(this); }
 
   _initSwipe() {
-    let sx, sy;
-    const min = 30;
+    let sx, sy; const min = 30;
     const vp = document.getElementById('viewport');
     if (!vp) return;
-    vp.addEventListener('touchstart', e => {
-      sx = e.touches[0].clientX;
-      sy = e.touches[0].clientY;
-    }, { passive: true });
+    vp.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
     vp.addEventListener('touchend', e => {
       if (sx == null) return;
-      let dx = e.changedTouches[0].clientX - sx;
-      let dy = e.changedTouches[0].clientY - sy;
+      let dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
       if (Math.abs(dx) < min && Math.abs(dy) < min) return;
       if (Math.abs(dx) > Math.abs(dy)) this.move(dx > 0 ? 1 : -1, 0);
       else this.move(0, dy > 0 ? 1 : -1);
@@ -997,6 +854,3 @@ class Game {
     }, { passive: true });
   }
 }
-
-
-/* Init handled by inline script in index.html */
