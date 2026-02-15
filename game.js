@@ -77,3 +77,43 @@ class Game {
   _die(reason) { this.alive = false; this.logMsg(reason, "l-bad"); UI.fullRender(this); UI.showDeath(this); }
   restart() { UI.hideDeath(); G = new Game(true); }
 }
+
+Object.assign(Game.prototype, {
+  setTab(t) {
+    document.querySelectorAll('.tc').forEach(c => c.classList.remove('on'));
+    document.querySelectorAll('.tb').forEach(b => b.classList.remove('on'));
+    const target = document.getElementById('tab-' + t);
+    if (target) target.classList.add('on');
+    const btn = document.querySelector(`[onclick*="setTab('${t}')"]`);
+    if (btn) btn.classList.add('on');
+  },
+
+  countItem(id) {
+    return this.inv.filter(i => i.id === id).reduce((sum, i) => sum + i.qty, 0);
+  },
+
+  getAdjacentZombies() {
+    return this.zombies.filter(z => Math.abs(z.x - this.p.x) <= 1 && Math.abs(z.y - this.p.y) <= 1 && !(z.x === this.p.x && z.y === this.p.y));
+  },
+
+  getNearbyZombieCount() {
+    return this.zombies.filter(z => Math.abs(z.x - this.p.x) <= 5 && Math.abs(z.y - this.p.y) <= 5).length;
+  },
+
+  getAdjacentContainers() {
+    if (this.location !== 'interior') return [];
+    let res = [];
+    for (let [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0],[0,0]]) {
+      let nx = this.p.x + dx, ny = this.p.y + dy;
+      if (nx >= 0 && nx < this.currentInterior.w && ny >= 0 && ny < this.currentInterior.h) {
+        let cell = this.currentInterior.map[ny][nx];
+        if (C.itiles[cell.type].container) res.push({cell});
+      }
+    }
+    return res;
+  },
+
+  getGroundItems() {
+    return this.groundItems[`${this.location}_${this.p.x}_${this.p.y}`] || [];
+  }
+});
