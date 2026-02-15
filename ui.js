@@ -72,8 +72,8 @@ const UI = {
     const c = document.getElementById('mapC');
     if (!c) return;
     c.innerHTML = '';
-    let rad = C.display.mapViewRadius, size = rad * 2 + 1;
-    document.documentElement.style.setProperty('--tile', C.display.tileSize + 'px');
+    let rad = 4, size = rad * 2 + 1;
+    document.documentElement.style.setProperty('--tile', '36px');
     c.className = 'mg';
     c.style.gridTemplateColumns = `repeat(${size},1fr)`;
     let zm = {};
@@ -85,6 +85,18 @@ const UI = {
     if (loc) loc.innerText = `${g.p.x}, ${g.p.y}`;
   },
 
+  /* Helper to get visual icon based on config settings */
+  _getIcon(def) {
+    if (C.visuals && C.visuals.style === 'ascii' && def.txt) {
+      if (def.type === 'grass' && C.visuals.randomizeTerrain) {
+        // Simple randomization for grass
+        return [',', '.', '`', '⁖'][Math.floor(Math.random() * 4)];
+      }
+      return def.txt;
+    }
+    return def.icon || def.ch; // Fallback to 'ch' if 'icon' missing
+  },
+
   _wtile(g, x, y, zm) {
     let e = document.createElement('div');
     e.className = 'tl';
@@ -92,38 +104,32 @@ const UI = {
     let td = g.map[y][x], def = C.tiles[td.type];
     let dist = Math.max(Math.abs(x - g.p.x), Math.abs(y - g.p.y));
     let known = g.visited.has(`${x},${y}`), vis = dist <= g.vision;
+    
     if (vis) {
       e.classList.add(def.css);
-      e.innerText = this._tch(td, x, y);
+      e.innerText = this._getIcon(def);
+      // REMOVED: The logic that added 't-dep' class when loot <= 0
+      
       let k = `${x},${y}`;
       if (zm[k] && !(x === g.p.x && y === g.p.y)) {
         let z = zm[k];
-        let zIcon = C.getIcon('e_' + z.type) || C.enemies[z.type].icon;
+        let zDef = C.enemies[z.type];
+        let zIcon = (C.visuals && C.visuals.style === 'ascii' && zDef.txt) ? zDef.txt : zDef.icon;
         e.innerHTML = `<span class="zi">${zIcon}</span>`;
-        if (C.display.showZombieGlow) e.classList.add('t-zomb');
+        e.classList.add('t-zomb');
       }
     } else if (known) {
-      e.classList.add(def.css);
-      e.innerText = this._tch(td, x, y);
+      e.classList.add(def.css, 't-mem');
+      e.innerText = this._getIcon(def);
     } else {
-      if (C.display.showFogOfWar) e.classList.add('t-fog');
-      else { e.style.background = '#000'; }
+      e.classList.add('t-fog');
     }
     if (x === g.p.x && y === g.p.y) {
-      let ic = g.isEncumbered ? C.getIcon('player_tired') : C.getIcon('player');
+      let ic = g.isEncumbered ? '😓' : '👤';
+      if (C.visuals && C.visuals.style === 'ascii') ic = '@';
       e.innerHTML += `<span class="pi">${ic}</span>`;
     }
     return e;
-  },
-
-  _tch(td, x, y) {
-    // Use icon system: random mode or variant tiles use coordinate-based picking
-    let iconEntry = C.icons[td.type];
-    if (iconEntry && C.display.enableTileVariants && iconEntry.random) {
-      if (td.type === 'forest') return iconEntry.random[(x * y) % iconEntry.random.length];
-      return iconEntry.random[(x + y) % iconEntry.random.length];
-    }
-    return C.getIcon(td.type, x, y);
   },
 
   /* ── Interior Rendering ────────────────────────────────── */
@@ -144,16 +150,23 @@ const UI = {
         let cell = int.map[y][x], def = C.itiles[cell.type];
         let e = document.createElement('div');
         e.className = 'tl ' + def.css;
-        e.innerText = C.getIcon(cell.type, x, y);
+        e.innerText = this._getIcon(def);
+        // Removed opacity drop for empty loot shelves to keep visual consistency
+        
         if (cell.barricadeHp > 0) e.innerHTML += `<div class="it-barr"></div>`;
         let k = `${x},${y}`;
         if (zm[k] && !(x === g.p.x && y === g.p.y)) {
           let z = zm[k];
-          let zIcon = C.getIcon('e_' + z.type) || C.enemies[z.type].icon;
+          let zDef = C.enemies[z.type];
+          let zIcon = (C.visuals && C.visuals.style === 'ascii' && zDef.txt) ? zDef.txt : zDef.icon;
           e.innerHTML = `<span class="zi">${zIcon}</span>`;
-          if (C.display.showZombieGlow) e.classList.add('t-zomb');
+          e.classList.add('t-zomb');
         }
-        if (x === g.p.x && y === g.p.y) e.innerHTML += `<span class="pi">${C.getIcon('player')}</span>`;
+        if (x === g.p.x && y === g.p.y) {
+           let ic = '👤';
+           if (C.visuals && C.visuals.style === 'ascii') ic = '@';
+           e.innerHTML += `<span class="pi">${ic}</span>`;
+        }
         c.appendChild(e);
       }
     }
@@ -172,42 +185,48 @@ const UI = {
   renderInspector(g) {
     if (g.location === 'interior') {
       let int = g.currentInterior, cell = int.map[g.p.y][g.p.x], def = C.itiles[cell.type];
-      document.getElementById('iIcon').innerText = C.getIcon(cell.type);
+      document.getElementById('iIcon').innerText = this._getIcon(def);
       let name = cell.type.charAt(0).toUpperCase() + cell.type.slice(1);
+      
+      // Better names
+      if (def.container) name += ' (Container)';
       if (cell.type === 'door' || cell.type === 'pdoor') name = 'Doorway';
       if (cell.type === 'window') name = 'Window';
-      if (cell.type === 'ladder') name = 'Ladder';
-      if (cell.type === 'pwall') name = 'Built Wall';
-      if (cell.type === 'bwall') name = 'Bunker Wall';
-      if (cell.type === 'bfloor') name = 'Bunker Floor';
       if (cell.type === 'stairs_up') name = 'Stairs Up';
       if (cell.type === 'stairs_down') name = 'Stairs Down';
+      
       document.getElementById('iName').innerText = name;
       let desc = '';
       if (cell.barricadeHp > 0) desc = `Barricaded (${cell.barricadeHp} HP)`;
       else if (def.entry) desc = cell.type === 'ladder' ? 'Climb to exit' : 'Entry/exit point';
       else if (def.stair) desc = def.stair === 'up' ? 'Go to the floor above' : 'Go to the floor below';
+      else if (def.container) desc = "Can store items inside.";
+      
       document.getElementById('iDesc').innerText = desc;
       let tags = '';
       let adj = Interior.getAdjacentSearchable(int, g.p.x, g.p.y);
       if (adj.length > 0) tags += `<span class="tag tag-l">LOOT NEARBY</span>`;
+      
+      // Updated container tag logic to support shelves/lockers/etc
+      let containers = g.getAdjacentContainers();
+      if (containers.length > 0) {
+        let count = 0;
+        containers.forEach(c => { if(c.cell.storage) count++; });
+        tags += `<span class="tag tag-crate">STORAGE</span>`;
+      }
+      
       let salv = Interior.getAdjacentSalvageable(int, g.p.x, g.p.y);
       if (salv.length > 0) tags += `<span class="tag tag-salv">SALVAGEABLE</span>`;
       let nz = g.interiorZombies.length;
       if (nz > 0) tags += `<span class="tag tag-d">${nz} INSIDE</span>`;
       if (g.currentBuilding && g.currentBuilding.floors.length > 1)
         tags += `<span class="tag tag-floor">F${g.currentFloor + 1}/${g.currentBuilding.floors.length}</span>`;
-      let containers = g.getAdjacentContainers();
-      if (containers.length > 0) {
-        let count = containers[0].cell.storage ? containers[0].cell.storage.length : 0;
-        let cTypeName = containers[0].cell.type ? containers[0].cell.type.toUpperCase() : 'STORAGE';
-        tags += `<span class="tag tag-crate">${cTypeName}${count > 0 ? ' ×' + count : ''}</span>`;
-      }
+
       document.getElementById('iTags').innerHTML = tags;
       return;
     }
     let cur = g.map[g.p.y][g.p.x], def = C.tiles[cur.type];
-    document.getElementById('iIcon').innerText = C.getIcon(cur.type);
+    document.getElementById('iIcon').innerText = this._getIcon(def);
     document.getElementById('iName').innerText = def.name;
     document.getElementById('iDesc').innerText = def.desc;
     let tags = '';
@@ -244,7 +263,7 @@ const UI = {
         let dir = this._dirLabel(z.x - g.p.x, z.y - g.p.y);
         html += `<button class="btn btn-a btn-fight" onclick="G.attackZombie(${z.x},${z.y},true)">⚔️ ATTACK ${ed.name} (${dir}) — ${z.hp}/${z.maxHp} HP</button>`;
       }
-      if (adj.length > 0) html += `<button class="btn btn-a" onclick="G.searchInterior()">🔍 SEARCH SHELVES</button>`;
+      if (adj.length > 0) html += `<button class="btn btn-a" onclick="G.searchInterior()">🔍 SEARCH SURROUNDINGS</button>`;
       if (salv.length > 0) html += `<button class="btn btn-a btn-salv" onclick="G.salvage()">🔨 SALVAGE FURNITURE</button>`;
       if (barr.length > 0 && g.skills.carpentry) html += `<button class="btn btn-a" onclick="G.barricade()">🪵 BARRICADE OPENING</button>`;
       if (onFloor) html += this._interiorPlaceButtons(g);
@@ -265,10 +284,15 @@ const UI = {
       // Container shortcut
       let containers = g.getAdjacentContainers();
       if (containers.length > 0) {
-        let cType = containers[0].cell.type;
-        let cLabel = cType ? cType.charAt(0).toUpperCase() + cType.slice(1) : 'Storage';
-        let cIcon = C.itiles[cType] ? C.itiles[cType].ch : '📦';
-        html += `<button class="btn btn-a btn-crate" onclick="G.setTab('crate')">${cIcon} OPEN ${cLabel.toUpperCase()}</button>`;
+        let label = "CONTAINER";
+        // Try to be specific if there's just one type
+        if (containers.length === 1) {
+           if (containers[0].cell.type === 'shelf') label = "SHELF";
+           else if (containers[0].cell.type === 'locker') label = "LOCKER";
+           else if (containers[0].cell.type === 'crate') label = "CRATE";
+           else if (containers[0].cell.type === 'counter') label = "COUNTER";
+        }
+        html += `<button class="btn btn-a btn-crate" onclick="G.setTab('crate')">📦 OPEN ${label}</button>`;
       }
 
       if (onEntry) {
@@ -448,9 +472,10 @@ const UI = {
       return;
     }
     let storage = containers[0].cell.storage || [];
-    let cType = containers[0].cell.type;
-    let cLabel = cType ? cType.charAt(0).toUpperCase() + cType.slice(1) : 'Storage';
-    let h = `<div style="padding:6px 10px;font-weight:bold;font-size:11px;border-bottom:1px solid #222;color:#888">${cLabel} contents: ${storage.length}</div>`;
+    let name = containers[0].cell.type.toUpperCase();
+    
+    let h = `<div style="padding:6px 10px;font-weight:bold;font-size:11px;border-bottom:1px solid #222;color:#888">${name} CONTENTS: ${storage.length}</div>`;
+    
     // Store buttons — items from inv
     if (g.inv.length > 0) {
       h += `<div class="sl">STORE FROM INVENTORY</div>`;
@@ -465,17 +490,18 @@ const UI = {
     }
     // Retrieve buttons
     if (storage.length > 0) {
-      h += `<div class="sl">RETRIEVE FROM ${cLabel.toUpperCase()}</div>`;
+      h += `<div class="sl">RETRIEVE FROM ${name}</div>`;
       h += storage.map((si, idx) => {
         let d = C.items[si.id];
         let qStr = si.qty > 1 ? ` <span class="bs">×${si.qty}</span>` : '';
         return `<div class="ii"><div style="flex:1"><div style="color:#ccc">${d.icon} ${d.name}${qStr}</div></div><div><button class="ib ib-u" onclick="G.retrieveFromContainer(${idx})">TAKE</button></div></div>`;
       }).join('');
     } else if (g.inv.length === 0) {
-      h += `<div style="padding:10px;color:#555;text-align:center">${cLabel} is empty.</div>`;
+      h += '<div style="padding:10px;color:#555;text-align:center">Container is empty.</div>';
     }
     el.innerHTML = h;
   },
+  
   renderChar(g) {
     document.getElementById('sVis').innerText = g.vision;
     document.getElementById('sAtk').innerText = g.attack;

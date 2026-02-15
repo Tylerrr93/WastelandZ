@@ -547,6 +547,7 @@ class Game {
       let nx = this.p.x + dx, ny = this.p.y + dy;
       if (nx < 0 || nx >= int.w || ny < 0 || ny >= int.h) continue;
       let cell = int.map[ny][nx], def = C.itiles[cell.type];
+      // Generalized check for any container type
       if (def && def.container) results.push({ x: nx, y: ny, cell });
     }
     return results;
@@ -557,16 +558,17 @@ class Game {
     let containers = this.getAdjacentContainers();
     if (containers.length === 0) return;
     let container = containers[0].cell;
+    
+    // Auto-init storage if missing (legacy support)
     if (!container.storage) container.storage = [];
+    
     let idx = this.inv.findIndex(i => i.uid === uid);
     if (idx === -1) return;
     let item = this.inv[idx], d = C.items[item.id];
     container.storage.push({ id: item.id, qty: 1 });
     item.qty--;
     if (item.qty <= 0) this.inv.splice(idx, 1);
-    let cDef = C.itiles[container.type] || {};
-    let cName = container.type ? container.type.charAt(0).toUpperCase() + container.type.slice(1) : 'storage';
-    this.logMsg(`Stored ${d.icon} ${d.name} in ${cName}.`, "l-good");
+    this.logMsg(`Stored ${d.icon} ${d.name}.`, "l-good");
     UI.fullRender(this);
   }
 
@@ -579,9 +581,7 @@ class Game {
     let si = container.storage[storageIdx];
     this.addItem(si.id, si.qty);
     container.storage.splice(storageIdx, 1);
-    let cDef2 = C.itiles[container.type] || {};
-    let cName2 = container.type ? container.type.charAt(0).toUpperCase() + container.type.slice(1) : 'storage';
-    this.logMsg(`Retrieved ${C.items[si.id].icon} ${C.items[si.id].name} from ${cName2}.`, "l-good");
+    this.logMsg(`Retrieved ${C.items[si.id].icon} ${C.items[si.id].name}.`, "l-good");
     UI.fullRender(this);
   }
 
@@ -663,9 +663,15 @@ class Game {
     let cell = int.map[this.p.y][this.p.x];
     if (cell.type !== 'floor' && cell.type !== 'bfloor')
       return this.logMsg("Can only place on open floor.", "l-bad");
+    
     cell.type = d.placeType;
     cell.barricadeHp = 0; cell.loot = 0;
-    if (C.itiles[d.placeType] && C.itiles[d.placeType].container) cell.storage = [];
+    
+    // Initialize storage if it's a container type
+    if (C.itiles[d.placeType].container) {
+       cell.storage = [];
+    }
+    
     let item = this.inv[idx];
     item.qty--; if (item.qty <= 0) this.inv.splice(idx, 1);
     this.logMsg(`Placed ${d.name}.`, "l-good");

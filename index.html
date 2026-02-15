@@ -114,7 +114,7 @@ display:flex;justify-content:space-between;align-items:center;height:42px;flex-s
 .t-hatch{background:#2e221b;border:2px solid #8b6a20;box-shadow:inset 0 0 8px rgba(139,106,32,.3)}
 .t-bedroll{background:#2a2520;color:#a89070;border:1px solid #6b5540;box-shadow:inset 0 0 6px rgba(168,144,112,.15)}
 .t-shelter{background:#2a2e1b;color:#8aaa60;border:2px solid #5a7830;box-shadow:inset 0 0 6px rgba(138,170,96,.15)}
-.t-dep{}.t-mem{}
+.t-dep{opacity:.45;filter:grayscale(1)}.t-mem{opacity:.35;filter:grayscale(.8)}
 .t-zomb{box-shadow:inset 0 0 8px rgba(218,54,51,.4)}
 .zi{position:absolute;z-index:8;filter:drop-shadow(0 0 3px rgba(200,0,0,.6));animation:zs 2s ease-in-out infinite}
 .pi{position:absolute;z-index:10;color:#fff;filter:drop-shadow(0 0 3px rgba(0,0,0,.9))}
@@ -132,9 +132,6 @@ display:flex;justify-content:space-between;align-items:center;height:42px;flex-s
 .it-bwall{background:#1a1520;color:#3a3040;border:1px solid #2a2030}
 .it-bfloor{background:#12101a;color:#2a2838}
 .it-crate{background:#3a3020;color:#e8b830;border:1px solid #8a6a20}
-.it-workbench{background:#2a2820;color:#c8a060;border:1px solid #6a5030}
-.it-barrel{background:#2a2520;color:#a89070;border:1px solid #6a5030}
-.it-locker{background:#2a2a30;color:#8888aa;border:1px solid #4a4a60}
 .it-barr{position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(139,90,43,.3) 3px,rgba(139,90,43,.3) 6px);border:1px solid #8b5a2b;z-index:5;pointer-events:none}
 
 /* ═══ BUTTONS ═══ */
@@ -277,7 +274,7 @@ display:flex;justify-content:space-between;align-items:center;height:42px;flex-s
         <button class="tb" data-tab="inv" onclick="G.setTab('inv')">INV</button>
         <button class="tb" data-tab="ground" onclick="G.setTab('ground')">GROUND</button>
         <button class="tb" data-tab="craft" onclick="G.setTab('craft')">CRAFT</button>
-        <button class="tb" data-tab="crate" onclick="G.setTab('crate')">STORAGE</button>
+        <button class="tb" data-tab="crate" onclick="G.setTab('crate')">CRATE</button>
         <button class="tb" data-tab="char" onclick="G.setTab('char')">STATUS</button>
       </div>
       <div id="tab-act" class="tc on"><div id="actList" class="ag"></div></div>
