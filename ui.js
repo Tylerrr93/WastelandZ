@@ -14,6 +14,8 @@ const UI = {
     this.renderActions(g);
     this.renderInventory(g);
     this.renderCrafting(g);
+    this.renderGround(g);
+    this.renderContainer(g);
     this.renderChar(g);
     this.renderMoodles(g);
     this.renderNight(g);
@@ -190,6 +192,11 @@ const UI = {
       if (nz > 0) tags += `<span class="tag tag-d">${nz} INSIDE</span>`;
       if (g.currentBuilding && g.currentBuilding.floors.length > 1)
         tags += `<span class="tag tag-floor">F${g.currentFloor + 1}/${g.currentBuilding.floors.length}</span>`;
+      let containers = g.getAdjacentContainers();
+      if (containers.length > 0) {
+        let count = containers[0].cell.storage ? containers[0].cell.storage.length : 0;
+        tags += `<span class="tag tag-crate">CRATE${count > 0 ? ' ×' + count : ''}</span>`;
+      }
       document.getElementById('iTags').innerHTML = tags;
       return;
     }
@@ -245,6 +252,14 @@ const UI = {
       // Rest — any interior gives indoor rest, bunker gives bunker rest
       html += this._restButton(g);
 
+      // Ground items indicator
+      let gItems = g.getGroundItems();
+      if (gItems.length > 0) html += `<button class="btn btn-a btn-ground" onclick="G.setTab('ground')">📋 ${gItems.length} ITEM${gItems.length > 1 ? 'S' : ''} ON GROUND</button>`;
+
+      // Container shortcut
+      let containers = g.getAdjacentContainers();
+      if (containers.length > 0) html += `<button class="btn btn-a btn-crate" onclick="G.setTab('crate')">📦 OPEN STORAGE CRATE</button>`;
+
       if (onEntry) {
         let exitLabel = cell.type === 'ladder' ? '🪜 CLIMB OUT' : '🚪 EXIT BUILDING';
         if (g.currentFloor !== 0)
@@ -270,6 +285,9 @@ const UI = {
         html += `<button class="btn btn-a" onclick="G.enterBuilding()">${icon} ${verb} ${name.toUpperCase()}</button>`;
       }
       html += this._worldPlaceButtons(g);
+      // Ground items indicator
+      let gItems = g.getGroundItems();
+      if (gItems.length > 0) html += `<button class="btn btn-a btn-ground" onclick="G.setTab('ground')">📋 ${gItems.length} ITEM${gItems.length > 1 ? 'S' : ''} ON GROUND</button>`;
       html += this._restButton(g);
       html += `<button class="btn btn-s" onclick="G.wait()">⏳ Wait</button>`;
     }
@@ -391,7 +409,60 @@ const UI = {
     el.innerHTML = h;
   },
 
-  /* ── Character Panel ───────────────────────────────────── */
+  /* ── Ground Items ──────────────────────────────────────── */
+  renderGround(g) {
+    let el = document.getElementById('groundList');
+    if (!el) return;
+    let items = g.getGroundItems();
+    if (items.length === 0) {
+      el.innerHTML = '<div style="padding:15px;color:#555;text-align:center">Nothing on the ground here.</div>';
+      return;
+    }
+    let h = `<div style="padding:6px 10px;font-weight:bold;font-size:11px;border-bottom:1px solid #222;color:#888">Items on ground: ${items.length}</div>`;
+    h += items.map((gi, idx) => {
+      let d = C.items[gi.id];
+      let qStr = gi.qty > 1 ? ` <span class="bs">×${gi.qty}</span>` : '';
+      return `<div class="ii"><div style="flex:1"><div style="font-weight:bold;color:#ccc">${d.icon} ${d.name}${qStr}</div></div><div><button class="ib ib-u" onclick="G.pickupItem(${idx})">TAKE</button></div></div>`;
+    }).join('');
+    el.innerHTML = h;
+  },
+
+  /* ── Container Panel ───────────────────────────────────── */
+  renderContainer(g) {
+    let el = document.getElementById('crateList');
+    if (!el) return;
+    let containers = g.getAdjacentContainers();
+    if (containers.length === 0) {
+      el.innerHTML = '<div style="padding:15px;color:#555;text-align:center">No storage crate nearby.</div>';
+      return;
+    }
+    let storage = containers[0].cell.storage || [];
+    let h = `<div style="padding:6px 10px;font-weight:bold;font-size:11px;border-bottom:1px solid #222;color:#888">Crate contents: ${storage.length}</div>`;
+    // Store buttons — items from inv
+    if (g.inv.length > 0) {
+      h += `<div class="sl">STORE FROM INVENTORY</div>`;
+      let seen = new Set();
+      for (let item of g.inv) {
+        if (seen.has(item.id)) continue;
+        seen.add(item.id);
+        let d = C.items[item.id];
+        let total = g.countItem(item.id);
+        h += `<div class="ii"><div style="flex:1"><div style="color:#aaa">${d.icon} ${d.name} <span class="bs">×${total}</span></div></div><div><button class="ib ib-p" onclick="G.storeInContainer('${item.uid}')">STORE</button></div></div>`;
+      }
+    }
+    // Retrieve buttons
+    if (storage.length > 0) {
+      h += `<div class="sl">RETRIEVE FROM CRATE</div>`;
+      h += storage.map((si, idx) => {
+        let d = C.items[si.id];
+        let qStr = si.qty > 1 ? ` <span class="bs">×${si.qty}</span>` : '';
+        return `<div class="ii"><div style="flex:1"><div style="color:#ccc">${d.icon} ${d.name}${qStr}</div></div><div><button class="ib ib-u" onclick="G.retrieveFromContainer(${idx})">TAKE</button></div></div>`;
+      }).join('');
+    } else if (g.inv.length === 0) {
+      h += '<div style="padding:10px;color:#555;text-align:center">Crate is empty.</div>';
+    }
+    el.innerHTML = h;
+  },
   renderChar(g) {
     document.getElementById('sVis').innerText = g.vision;
     document.getElementById('sAtk').innerText = g.attack;

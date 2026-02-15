@@ -67,6 +67,7 @@ display:flex;justify-content:space-between;align-items:center;height:42px;flex-s
 .tag-camp{background:#1a1a10;color:#c8a832;border:1px solid #8a7020;font-size:10px}
 .tag-salv{background:#1a1520;color:#aa88cc;border:1px solid #7755aa;font-size:10px}
 .tag-floor{background:#0d2030;color:#6090b0;border:1px solid #4070a0;font-size:10px}
+.tag-crate{background:#2a2010;color:#d29922;border:1px solid #8a6a20;font-size:10px}
 
 /* ═══ LOG ═══ */
 .lc{flex:1;display:flex;flex-direction:column;background:#080808;min-width:140px}
@@ -87,8 +88,11 @@ display:flex;justify-content:space-between;align-items:center;height:42px;flex-s
 .bb{height:280px;display:flex;border-top:2px solid var(--border);background:var(--panel);flex-shrink:0}
 .pl{flex:1;display:flex;flex-direction:column;border-right:1px solid var(--border);min-width:0}
 .pr{width:160px;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:10px}
+.mp{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;width:100%}
+.mp .btn{padding:12px;justify-content:center}
+.cc{display:flex;align-items:center;justify-content:center;font-size:18px}
 .tabs{display:flex;border-bottom:1px solid var(--border);background:#000}
-.tb{flex:1;padding:10px 4px;background:0;border:none;color:#555;cursor:pointer;font-weight:bold;font-size:10px;font-family:inherit;letter-spacing:.5px;border-right:1px solid #1a1a1a;transition:color .2s}
+.tb{flex:1;padding:10px 2px;background:0;border:none;color:#555;cursor:pointer;font-weight:bold;font-size:9px;font-family:inherit;letter-spacing:.3px;border-right:1px solid #1a1a1a;transition:color .2s}
 .tb:last-child{border-right:none}.tb.on{background:var(--panel);color:var(--accent);border-top:2px solid var(--accent)}
 .tab-flash{animation:tabPulse 0.6s ease}
 @keyframes tabPulse{0%{color:#555}30%{color:#3fb950;text-shadow:0 0 6px rgba(63,185,80,.4)}100%{color:#555}}
@@ -127,6 +131,7 @@ display:flex;justify-content:space-between;align-items:center;height:42px;flex-s
 .it-pdoor{background:#3a3020;color:#c8a040;border:1px dashed #806020}
 .it-bwall{background:#1a1520;color:#3a3040;border:1px solid #2a2030}
 .it-bfloor{background:#12101a;color:#2a2838}
+.it-crate{background:#3a3020;color:#e8b830;border:1px solid #8a6a20}
 .it-barr{position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(139,90,43,.3) 3px,rgba(139,90,43,.3) 6px);border:1px solid #8b5a2b;z-index:5;pointer-events:none}
 
 /* ═══ BUTTONS ═══ */
@@ -141,6 +146,8 @@ display:flex;justify-content:space-between;align-items:center;height:42px;flex-s
 .btn-salv:active{background:#2a2030!important}
 .btn-stair{background:#0d2020!important;border-color:#2a5a50!important;color:#60c8a0!important}
 .btn-stair:active{background:#1a3030!important}
+.btn-ground{background:#1a1a15!important;border-color:#4a4830!important;color:#c8c060!important}
+.btn-crate{background:#2a2010!important;border-color:#6a5020!important;color:#d29922!important}
 
 /* ── Rest buttons ── */
 .btn-rest-rough{background:#1a1a18!important;border-color:#3a3520!important;color:#999!important}
@@ -192,7 +199,7 @@ display:flex;justify-content:space-between;align-items:center;height:42px;flex-s
 .main{flex-direction:column}
 .mc{width:100%;height:45vh;border-right:none;border-bottom:1px solid var(--border);max-width:none}
 .lc{flex:1;min-height:0}.bb{height:240px}.pr{width:135px;padding:8px}
-.mp .btn{padding:12px}.sg{gap:5px;font-size:11px}
+.sg{gap:5px;font-size:11px}
 .intro-txt{font-size:14px;padding:0 20px}
 }
 @media(max-height:700px){.bb{height:220px}}
@@ -265,12 +272,16 @@ display:flex;justify-content:space-between;align-items:center;height:42px;flex-s
       <div class="tabs">
         <button class="tb on" data-tab="act" onclick="G.setTab('act')">ACTIONS</button>
         <button class="tb" data-tab="inv" onclick="G.setTab('inv')">INV</button>
+        <button class="tb" data-tab="ground" onclick="G.setTab('ground')">GROUND</button>
         <button class="tb" data-tab="craft" onclick="G.setTab('craft')">CRAFT</button>
+        <button class="tb" data-tab="crate" onclick="G.setTab('crate')">CRATE</button>
         <button class="tb" data-tab="char" onclick="G.setTab('char')">STATUS</button>
       </div>
       <div id="tab-act" class="tc on"><div id="actList" class="ag"></div></div>
       <div id="tab-inv" class="tc"><div id="invList"></div></div>
+      <div id="tab-ground" class="tc"><div id="groundList"></div></div>
       <div id="tab-craft" class="tc"><div id="craftList"></div></div>
+      <div id="tab-crate" class="tc"><div id="crateList"></div></div>
       <div id="tab-char" class="tc">
         <div class="cs">
           <span>👁 <strong id="sVis">0</strong></span>

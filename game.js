@@ -20,6 +20,7 @@ class Game {
     this.kills = 0;
     this.zombies = [];
     this._lastNight = -1;
+    this.groundItems = {}; // position key → [{id, qty}, ...]
 
     // Interior state
     this.location = 'world';
@@ -527,13 +528,57 @@ class Game {
       }
     }
     let oldName = target.cell.type.charAt(0).toUpperCase() + target.cell.type.slice(1);
-    target.cell.type = 'floor';
+    let floorType = (this.currentBuilding && this.currentBuilding.buildingType === 'bunker') ? 'bfloor' : 'floor';
+    target.cell.type = floorType;
     target.cell.loot = 0;
     target.cell.barricadeHp = 0;
     this.gainXp('survival', 10);
     this._degradeSlot('tool', C.tuning.durTool);
     this.logMsg(`Salvaged ${oldName} for materials.`, "l-good");
     this.tick(); UI.fullRender(this);
+  }
+
+  /** Get adjacent container cells */
+  getAdjacentContainers() {
+    if (this.location !== 'interior') return [];
+    let int = this.currentInterior;
+    let results = [];
+    for (let [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
+      let nx = this.p.x + dx, ny = this.p.y + dy;
+      if (nx < 0 || nx >= int.w || ny < 0 || ny >= int.h) continue;
+      let cell = int.map[ny][nx], def = C.itiles[cell.type];
+      if (def && def.container) results.push({ x: nx, y: ny, cell });
+    }
+    return results;
+  }
+
+  /** Store an item from inventory into adjacent container */
+  storeInContainer(uid) {
+    let containers = this.getAdjacentContainers();
+    if (containers.length === 0) return;
+    let container = containers[0].cell;
+    if (!container.storage) container.storage = [];
+    let idx = this.inv.findIndex(i => i.uid === uid);
+    if (idx === -1) return;
+    let item = this.inv[idx], d = C.items[item.id];
+    container.storage.push({ id: item.id, qty: 1 });
+    item.qty--;
+    if (item.qty <= 0) this.inv.splice(idx, 1);
+    this.logMsg(`Stored ${d.icon} ${d.name} in crate.`, "l-good");
+    UI.fullRender(this);
+  }
+
+  /** Retrieve an item from adjacent container */
+  retrieveFromContainer(storageIdx) {
+    let containers = this.getAdjacentContainers();
+    if (containers.length === 0) return;
+    let container = containers[0].cell;
+    if (!container.storage || storageIdx >= container.storage.length) return;
+    let si = container.storage[storageIdx];
+    this.addItem(si.id, si.qty);
+    container.storage.splice(storageIdx, 1);
+    this.logMsg(`Retrieved ${C.items[si.id].icon} ${C.items[si.id].name} from crate.`, "l-good");
+    UI.fullRender(this);
   }
 
 
@@ -616,6 +661,7 @@ class Game {
       return this.logMsg("Can only place on open floor.", "l-bad");
     cell.type = d.placeType;
     cell.barricadeHp = 0; cell.loot = 0;
+    if (d.placeType === 'crate') cell.storage = [];
     let item = this.inv[idx];
     item.qty--; if (item.qty <= 0) this.inv.splice(idx, 1);
     this.logMsg(`Placed ${d.name}.`, "l-good");
@@ -747,8 +793,42 @@ class Game {
   dropItem(uid) {
     let idx = this.inv.findIndex(i => i.uid === uid);
     if (idx === -1) return;
-    this.inv.splice(idx, 1);
-    UI.renderInventory(this);
+    let item = this.inv[idx], d = C.items[item.id];
+    // Build a ground item (1 qty)
+    let posKey = this._groundKey();
+    if (!this.groundItems[posKey]) this.groundItems[posKey] = [];
+    this.groundItems[posKey].push({ id: item.id, qty: 1 });
+    // Reduce inventory
+    item.qty--;
+    if (item.qty <= 0) this.inv.splice(idx, 1);
+    this.logMsg(`Dropped ${d.icon} ${d.name}.`);
+    UI.flashTab('ground');
+    UI.fullRender(this);
+  }
+
+  pickupItem(groundIdx) {
+    let posKey = this._groundKey();
+    let pile = this.groundItems[posKey];
+    if (!pile || groundIdx >= pile.length) return;
+    let gi = pile[groundIdx];
+    this.addItem(gi.id, gi.qty);
+    pile.splice(groundIdx, 1);
+    if (pile.length === 0) delete this.groundItems[posKey];
+    this.logMsg(`Picked up ${C.items[gi.id].icon} ${C.items[gi.id].name}.`, "l-good");
+    UI.fullRender(this);
+  }
+
+  getGroundItems() {
+    let posKey = this._groundKey();
+    return this.groundItems[posKey] || [];
+  }
+
+  _groundKey() {
+    if (this.location === 'interior') {
+      let wp = this.worldPos;
+      return `i:${wp.x},${wp.y}:f${this.currentFloor}:${this.p.x},${this.p.y}`;
+    }
+    return `w:${this.p.x},${this.p.y}`;
   }
 
 

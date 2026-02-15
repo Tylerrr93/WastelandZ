@@ -36,6 +36,7 @@ itiles: {
   stairs_down:{ch:'▼', css:'it-stdn',      pass:true, stair:'down'},
   pwall:      {ch:'▓', css:'it-pwall',     pass:false, salvageable:true},
   pdoor:      {ch:'╬', css:'it-pdoor',     pass:true, barricadable:true, salvageable:true},
+  crate:      {ch:'📦',css:'it-crate',     pass:false, container:true, salvageable:true},
   bwall:      {ch:'█', css:'it-bwall',     pass:false},
   bfloor:     {ch:'░', css:'it-bfloor',    pass:true},
 },
@@ -46,6 +47,7 @@ salvageYields: {
   counter: [{id:'scrap',qty:1},{id:'nails',min:0,max:2}],
   pwall:   [{id:'wood',qty:1},{id:'nails',min:1,max:2}],
   pdoor:   [{id:'wood',qty:1},{id:'nails',qty:1}],
+  crate:   [{id:'wood',qty:2},{id:'nails',min:1,max:3},{id:'scrap',qty:1}],
 },
 
 /* ── Skills ──────────────────────────────────────────────── */
@@ -81,6 +83,7 @@ items: {
   shelter_kit: {name:"Lean-To Kit",    type:'place', icon:'🏕️',placeType:'shelter',wgt:3.0},
   wall_frame:  {name:"Wall Frame",     type:'iplace',icon:'🧱',placeType:'pwall',wgt:2.0},
   door_frame:  {name:"Door Frame",     type:'iplace',icon:'🚪',placeType:'pdoor',wgt:1.5},
+  crate_kit:   {name:"Storage Crate",  type:'iplace',icon:'📦',placeType:'crate',wgt:3.0},
 },
 
 /* ── Enemies ─────────────────────────────────────────────── */
@@ -106,6 +109,7 @@ recipes: {
   wall_frame:  {name:"Wall Frame",   cat:'building', reqSkill:['carpentry',1], inputs:{wood:2,nails:4},         result:{type:'item',id:'wall_frame',count:1}},
   door_frame:  {name:"Door Frame",   cat:'building', reqSkill:['carpentry',1], inputs:{wood:2,nails:2},         result:{type:'item',id:'door_frame',count:1}},
   shelter_c:   {name:"Lean-To Kit",  cat:'building', reqSkill:['carpentry',1], inputs:{wood:3,cloth:3,nails:4}, result:{type:'item',id:'shelter_kit',count:1}},
+  crate_c:     {name:"Storage Crate",cat:'building', reqSkill:['carpentry',1], inputs:{wood:3,nails:4,scrap:1}, result:{type:'item',id:'crate_kit',count:1}},
 },
 
 /* ── Rest Tiers ──────────────────────────────────────────── */
