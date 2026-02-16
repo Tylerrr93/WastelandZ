@@ -134,6 +134,15 @@ display:flex;justify-content:space-between;align-items:center;height:42px;flex-s
 .it-crate{background:#3a3020;color:#e8b830;border:1px solid #8a6a20}
 .it-barr{position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(139,90,43,.3) 3px,rgba(139,90,43,.3) 6px);border:1px solid #8b5a2b;z-index:5;pointer-events:none}
 
+/* ═══ CUSTOM TILE IMAGES ═══ */
+.tile-img{width:100%;height:100%;object-fit:contain;image-rendering:pixelated;pointer-events:none;display:block;position:absolute;inset:0;z-index:1}
+.tl.has-img{font-size:0;color:transparent}
+.tl.has-img .pi,.tl.has-img .zi{font-size:calc(var(--tile)*.6)}
+
+/* ═══ GROUND ITEM OVERLAY ═══ */
+.gi-ov{position:absolute;bottom:1px;right:1px;width:8px;height:8px;border-radius:50%;background:#d29922;border:1px solid #8a6a10;z-index:6;pointer-events:none;box-shadow:0 0 4px rgba(210,153,34,.5);animation:giPulse 2.5s ease-in-out infinite}
+@keyframes giPulse{0%,100%{opacity:.7;transform:scale(1)}50%{opacity:1;transform:scale(1.2)}}
+
 /* ═══ BUTTONS ═══ */
 .btn{background:#1a1f27;border:1px solid #2a2f37;color:var(--text);padding:10px;cursor:pointer;border-radius:4px;width:100%;text-align:left;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;font-family:inherit;font-size:12px}
 .btn:hover:not(:disabled){background:#2a2f37;border-color:#555}

@@ -14,6 +14,29 @@ visuals: {
   randomizeTerrain: true,
 },
 
+/* ── Custom Image Tiles ───────────────────────────────────── 
+   Any tile, interior tile, item, or enemy definition can use
+   custom images instead of (or alongside) emoji/ASCII text.
+   
+   Add to any tile/itile/item/enemy definition:
+     img:  'path/to/image.png'       — single custom image
+     imgV: ['a.png','b.png','c.png'] — random image variants
+   
+   Images are rendered at tile size (var(--tile), default 36px).
+   Recommended: PNG or SVG, ≤64×64px, transparent backgrounds.
+   imgV works like iconV — picks a stable-random variant per tile.
+   
+   ASCII mode always ignores custom images (uses txt/txtV).
+   If img is not set, existing icon/txt behavior is unchanged.
+   
+   Example usage:
+     grass: { txt:',', icon:',', img:'tiles/grass.png',
+              imgV:['tiles/grass1.png','tiles/grass2.png'],
+              css:'t-grass', pass:true, ... },
+     
+     zombie: { icon:'🧟', img:'enemies/zombie.png', ... },
+   ════════════════════════════════════════════════════════════ */
+
 /* ── World Tiles ─────────────────────────────────────────── */
 // txt: ASCII character, icon: Emoji, css: class name
 tiles: {

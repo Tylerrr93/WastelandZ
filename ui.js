@@ -110,6 +110,76 @@ const UI = {
     return def.icon || def.txt; 
   },
 
+  /* ── Custom Image Tile Support ──────────────────────────── */
+  /* Returns {text, img} — if img is set, render an <img> tag
+     instead of text. img/imgV in tile defs point to image URLs.
+     Images should be small (ideally ≤64×64 px) PNG/SVG/WebP.  */
+  _getTileDisplay(def, x, y) {
+    const hasCoords = (x !== undefined && y !== undefined);
+    const isAscii = C.visuals && C.visuals.style === 'ascii';
+
+    // ASCII mode never uses custom images
+    if (!isAscii) {
+      // Check image variants first
+      if (hasCoords && C.visuals && C.visuals.randomizeTerrain && def.imgV && def.imgV.length > 0) {
+        return { img: def.imgV[this._tileHash(x, y) % def.imgV.length] };
+      }
+      // Single image
+      if (def.img) {
+        return { img: def.img };
+      }
+    }
+
+    // Fall through to standard text/emoji display
+    return { text: this._getIcon(def, x, y) };
+  },
+
+  /* Apply tile display to a DOM element (text or image) */
+  _applyTileDisplay(el, display) {
+    if (display.img) {
+      el.classList.add('has-img');
+      let img = document.createElement('img');
+      img.className = 'tile-img';
+      img.src = display.img;
+      img.alt = '';
+      img.draggable = false;
+      img.onerror = function() { this.style.display = 'none'; };
+      el.appendChild(img);
+    } else {
+      el.innerText = display.text;
+    }
+  },
+
+  /* Ground item overlay — shows a small dot if items exist on a tile */
+  _groundOverlay(el, g, x, y, isInterior) {
+    let key;
+    if (isInterior) {
+      let wp = g.worldPos;
+      key = `i:${wp.x},${wp.y}:f${g.currentFloor}:${x},${y}`;
+    } else {
+      key = `w:${x},${y}`;
+    }
+    if (g.groundItems[key] && g.groundItems[key].length > 0) {
+      let dot = document.createElement('div');
+      dot.className = 'gi-ov';
+      el.appendChild(dot);
+    }
+  },
+
+  /* Preload images for custom tile graphics (call once at init) */
+  preloadImages() {
+    let urls = new Set();
+    const collect = (def) => {
+      if (def.img) urls.add(def.img);
+      if (def.imgV) def.imgV.forEach(u => urls.add(u));
+    };
+    for (let k in C.tiles) collect(C.tiles[k]);
+    for (let k in C.itiles) collect(C.itiles[k]);
+    for (let k in C.items) { if (C.items[k].img) urls.add(C.items[k].img); }
+    if (C.enemies) for (let k in C.enemies) { if (C.enemies[k].img) urls.add(C.enemies[k].img); }
+    urls.forEach(u => { let i = new Image(); i.src = u; });
+  },
+
   _wtile(g, x, y, zm) {
     let e = document.createElement('div');
     e.className = 'tl';
@@ -120,19 +190,27 @@ const UI = {
     
     if (vis) {
       e.classList.add(def.css);
-      e.innerText = this._getIcon(def, x, y);
+      let display = this._getTileDisplay(def, x, y);
+      this._applyTileDisplay(e, display);
       
       let k = `${x},${y}`;
       if (zm[k] && !(x === g.p.x && y === g.p.y)) {
         let z = zm[k];
         let zDef = C.enemies[z.type];
-        let zIcon = (C.visuals && C.visuals.style === 'ascii' && zDef.txt) ? zDef.txt : zDef.icon;
+        let zIcon;
+        if (!(C.visuals && C.visuals.style === 'ascii') && zDef.img) {
+          zIcon = `<img class="tile-img" src="${zDef.img}" alt="" draggable="false" onerror="this.style.display='none'">`;
+        } else {
+          zIcon = (C.visuals && C.visuals.style === 'ascii' && zDef.txt) ? zDef.txt : zDef.icon;
+        }
         e.innerHTML = `<span class="zi">${zIcon}</span>`;
         e.classList.add('t-zomb');
       }
+      this._groundOverlay(e, g, x, y, false);
     } else if (known) {
       e.classList.add(def.css, 't-mem');
-      e.innerText = this._getIcon(def, x, y);
+      let display = this._getTileDisplay(def, x, y);
+      this._applyTileDisplay(e, display);
     } else {
       e.classList.add('t-fog');
     }
@@ -162,14 +240,20 @@ const UI = {
         let cell = int.map[y][x], def = C.itiles[cell.type];
         let e = document.createElement('div');
         e.className = 'tl ' + def.css;
-        e.innerText = this._getIcon(def, x, y);
+        let display = this._getTileDisplay(def, x, y);
+        this._applyTileDisplay(e, display);
         
         if (cell.barricadeHp > 0) e.innerHTML += `<div class="it-barr"></div>`;
         let k = `${x},${y}`;
         if (zm[k] && !(x === g.p.x && y === g.p.y)) {
           let z = zm[k];
           let zDef = C.enemies[z.type];
-          let zIcon = (C.visuals && C.visuals.style === 'ascii' && zDef.txt) ? zDef.txt : zDef.icon;
+          let zIcon;
+          if (!(C.visuals && C.visuals.style === 'ascii') && zDef.img) {
+            zIcon = `<img class="tile-img" src="${zDef.img}" alt="" draggable="false" onerror="this.style.display='none'">`;
+          } else {
+            zIcon = (C.visuals && C.visuals.style === 'ascii' && zDef.txt) ? zDef.txt : zDef.icon;
+          }
           e.innerHTML = `<span class="zi">${zIcon}</span>`;
           e.classList.add('t-zomb');
         }
@@ -178,6 +262,7 @@ const UI = {
            if (C.visuals && C.visuals.style === 'ascii') ic = '@';
            e.innerHTML += `<span class="pi">${ic}</span>`;
         }
+        this._groundOverlay(e, g, x, y, true);
         c.appendChild(e);
       }
     }

@@ -59,12 +59,14 @@ class Game {
 
     // Show intro or skip to game
     if (!skipIntro) {
+      UI.preloadImages();
       UI.showIntro(() => {
         UI.fullRender(this);
         this.logMsg("Read the Carpentry book to learn building.", "l-imp");
         this.logMsg("Use the ladder to reach the surface.", "l-imp");
       });
     } else {
+      UI.preloadImages();
       UI.fullRender(this);
       this.logMsg("Read the Carpentry book to learn building.", "l-imp");
       this.logMsg("Use the ladder to reach the surface.", "l-imp");
