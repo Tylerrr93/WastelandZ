@@ -17,10 +17,18 @@ visuals: {
 /* ── World Tiles ─────────────────────────────────────────── */
 // txt: ASCII character, icon: Emoji, css: class name
 tiles: {
-  grass:        {txt:',', icon:',',  css:'t-grass',      pass:true,  cap:2, name:"Wild Grass",      desc:"Overgrown vegetation.", placeable:true},
-  forest:       {txt:'T', icon:'🌲', css:'t-forest',     pass:true,  cap:4, name:"Deep Woods",      desc:"Dense trees. Good cover.", placeable:true},
-  water:        {txt:'~', icon:'≈',  css:'t-water',      pass:false, cap:0, name:"Deep Water",      desc:"Impassable."},
-  road:         {txt:'.', icon:'·',  css:'t-road',       pass:true,  cap:2, name:"Old Road",        desc:"Cracked asphalt.", placeable:true},
+  grass:        {txt:',', icon:',',  css:'t-grass',      pass:true,  cap:2, name:"Wild Grass",      desc:"Overgrown vegetation.", placeable:true,
+                 txtV:[',','.','\`','\'',';','⁖','˙','‥'],
+                 iconV:[',','.','\`','\'',';','⁖','˙','∴','‥','⸪']},
+  forest:       {txt:'T', icon:'🌲', css:'t-forest',     pass:true,  cap:4, name:"Deep Woods",      desc:"Dense trees. Good cover.", placeable:true,
+                 txtV:['T','t','Y','♣','↟','T','t','¥'],
+                 iconV:['🌲','🌳','🌿','🌲','🌳','↟','♣','🍂','🌲','🌳']},
+  water:        {txt:'~', icon:'≈',  css:'t-water',      pass:false, cap:0, name:"Deep Water",      desc:"Impassable.",
+                 txtV:['~','~','≈','∽','~','≈','~','∿'],
+                 iconV:['≈','~','≋','∽','〰','≈','~','∿','≈','〰']},
+  road:         {txt:'.', icon:'·',  css:'t-road',       pass:true,  cap:2, name:"Old Road",        desc:"Cracked asphalt.", placeable:true,
+                 txtV:['.','.','·','∙','.','·','.','⋅'],
+                 iconV:['·','∙','⋅','·','·','∙','·','⋅']},
   bridge:       {txt:'=', icon:'=',  css:'t-bridge',     pass:true,  cap:0, name:"Bridge",          desc:"Safe crossing."},
   house:        {txt:'H', icon:'🏚️', css:'t-house',      pass:true,  cap:3, name:"Abandoned House",  desc:"Enterable. Search inside.", enter:true, buildName:"House"},
   store:        {txt:'S', icon:'🛒', css:'t-store',      pass:true,  cap:5, name:"Looted Store",     desc:"Rich pickings inside.", enter:true, buildName:"Store"},

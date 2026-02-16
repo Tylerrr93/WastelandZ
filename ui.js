@@ -85,29 +85,28 @@ const UI = {
     if (loc) loc.innerText = `${g.p.x}, ${g.p.y}`;
   },
 
+  /* Coordinate hash — looks random but stays stable between renders */
+  _tileHash(x, y) {
+    let h = x * 374761393 + y * 668265263;
+    h = (h ^ (h >> 13)) * 1274126177;
+    return (h ^ (h >> 16)) >>> 0;
+  },
+
   /* Helper to get visual icon based on config settings */
-  _getIcon(def) {
-    // 1. Handle Randomization (Works for both 'emoji' and 'ascii' styles)
-    if (C.visuals && C.visuals.randomizeTerrain) {
-      if (def.type === 'grass') {
-        // Randomize grass punctuation for texture
-        const grassChars = [',', '.', '`', '´', '⁖', '\''];
-        return grassChars[Math.floor(Math.random() * grassChars.length)];
-      }
-      if (def.type === 'forest') {
-        // Randomize trees
-        if (C.visuals.style === 'emoji') {
-           return ['🌲', '🌳', '🌲'][Math.floor(Math.random() * 3)];
-        } else {
-           return ['T', 't', 'Y', '¥'][Math.floor(Math.random() * 4)];
-        }
+  _getIcon(def, x, y) {
+    const hasCoords = (x !== undefined && y !== undefined);
+    const isAscii = C.visuals && C.visuals.style === 'ascii';
+
+    // Use variant arrays when available and we have coordinates
+    if (hasCoords && C.visuals && C.visuals.randomizeTerrain) {
+      const variants = isAscii ? def.txtV : def.iconV;
+      if (variants && variants.length > 0) {
+        return variants[this._tileHash(x, y) % variants.length];
       }
     }
 
-    // 2. Standard Display Logic
-    if (C.visuals && C.visuals.style === 'ascii' && def.txt) {
-      return def.txt;
-    }
+    // Standard display logic (fallback)
+    if (isAscii && def.txt) return def.txt;
     return def.icon || def.txt; 
   },
 
@@ -121,7 +120,7 @@ const UI = {
     
     if (vis) {
       e.classList.add(def.css);
-      e.innerText = this._getIcon(def);
+      e.innerText = this._getIcon(def, x, y);
       
       let k = `${x},${y}`;
       if (zm[k] && !(x === g.p.x && y === g.p.y)) {
@@ -133,7 +132,7 @@ const UI = {
       }
     } else if (known) {
       e.classList.add(def.css, 't-mem');
-      e.innerText = this._getIcon(def);
+      e.innerText = this._getIcon(def, x, y);
     } else {
       e.classList.add('t-fog');
     }
@@ -163,7 +162,7 @@ const UI = {
         let cell = int.map[y][x], def = C.itiles[cell.type];
         let e = document.createElement('div');
         e.className = 'tl ' + def.css;
-        e.innerText = this._getIcon(def);
+        e.innerText = this._getIcon(def, x, y);
         
         if (cell.barricadeHp > 0) e.innerHTML += `<div class="it-barr"></div>`;
         let k = `${x},${y}`;
