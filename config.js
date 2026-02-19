@@ -55,7 +55,7 @@ tiles: {
   bridge:       {txt:'=', icon:'=',  css:'t-bridge',     pass:true,  cap:0, name:"Bridge",          desc:"Safe crossing."},
   house:        {txt:'H', icon:'🏚️', css:'t-house',      pass:true,  cap:3, name:"Abandoned House",  desc:"Enterable. Search inside.", enter:true, buildName:"House"},
   store:        {txt:'S', icon:'🛒', css:'t-store',      pass:true,  cap:5, name:"Looted Store",     desc:"Rich pickings inside.", enter:true, buildName:"Store"},
-  garage:       {txt:'G', icon:'⚙️', img: 'assets/buildings/auto_garage.png', css:'t-garage',     pass:true,  cap:3, name:"Auto Garage",      desc:"Might find tools.", enter:true, buildName:"Garage"},
+  garage:       {img: 'assets/buildings/auto_garage.png', css:'t-garage',     pass:true,  cap:3, name:"Auto Garage",      desc:"Might find tools.", enter:true, buildName:"Garage"},
   clinic:       {txt:'+', icon:'➕', css:'t-clinic',     pass:true,  cap:4, name:"Medical Clinic",   desc:"Could have medical supplies.", enter:true, buildName:"Clinic"},
   warehouse:    {txt:'W', icon:'📦', css:'t-warehouse',  pass:true,  cap:6, name:"Warehouse",        desc:"Large storage building.", enter:true, buildName:"Warehouse"},
   bunker_hatch: {txt:'O', icon:'🔒', css:'t-hatch',      pass:true,  cap:0, name:"Bunker Hatch",     desc:"Your underground shelter.", enter:true, buildName:"Bunker"},
