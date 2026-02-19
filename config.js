@@ -53,7 +53,7 @@ tiles: {
                  txtV:['.','.','·','∙','.','·','.','⋅'],
                  iconV:['·','∙','⋅','·','·','∙','·','⋅']},
   bridge:       {txt:'=', icon:'=',  css:'t-bridge',     pass:true,  cap:0, name:"Bridge",          desc:"Safe crossing."},
-  house:        {txt:'H', icon:'🏚️', css:'t-house',      pass:true,  cap:3, name:"Abandoned House",  desc:"Enterable. Search inside.", enter:true, buildName:"House"},
+  house:        {imgV: ['assets/buildings/house_1.png','assets/buildings/house_2.png','assets/buildings/house_3.png','assets/buildings/house_4.png','assets/buildings/house_5.png','assets/buildings/house_6.png','assets/buildings/house_7.png'], css:'t-house',      pass:true,  cap:3, name:"Abandoned House",  desc:"Enterable. Search inside.", enter:true, buildName:"House"},
   store:        {txt:'S', icon:'🛒', css:'t-store',      pass:true,  cap:5, name:"Looted Store",     desc:"Rich pickings inside.", enter:true, buildName:"Store"},
   garage:       {img: 'assets/buildings/auto_garage.png', css:'t-garage',     pass:true,  cap:3, name:"Auto Garage",      desc:"Might find tools.", enter:true, buildName:"Garage"},
   clinic:       {txt:'+', icon:'➕', css:'t-clinic',     pass:true,  cap:4, name:"Medical Clinic",   desc:"Could have medical supplies.", enter:true, buildName:"Clinic"},
