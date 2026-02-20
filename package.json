@@ -1,0 +1,16 @@
+{
+  "name": "wastelandz",
+  "version": "1.0.0",
+  "description": "Wasteland Survivor — A post-apocalyptic browser survival game",
+  "scripts": {
+    "build": "npx esbuild src/main.ts --bundle --outfile=dist/bundle.js --format=iife --target=es2020 --sourcemap && node build-copy.js",
+    "build:min": "npx esbuild src/main.ts --bundle --outfile=dist/bundle.js --format=iife --target=es2020 --minify --sourcemap && node build-copy.js",
+    "watch": "npx esbuild src/main.ts --bundle --outfile=dist/bundle.js --format=iife --target=es2020 --sourcemap --watch",
+    "typecheck": "npx tsc --noEmit",
+    "dev": "npm run typecheck && npm run build"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.3",
+    "typescript": "^5.7.0"
+  }
+}
