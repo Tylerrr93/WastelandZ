@@ -678,4 +678,27 @@ export const UI = {
     const e = document.getElementById('deathScr');
     if (e) e.classList.remove('on');
   },
+
+  setTab(tabName: string): void {
+    // Deactivate all tab panels and buttons
+    document.querySelectorAll('.tp').forEach(p => p.classList.remove('on'));
+    document.querySelectorAll('.tb').forEach(b => b.classList.remove('on'));
+    // Activate the requested tab panel
+    const panel = document.getElementById(tabName + 'P');
+    if (panel) panel.classList.add('on');
+    // Activate the matching tab button
+    const btn = document.querySelector(`.tb[data-tab="${tabName}"]`) as HTMLElement | null;
+    if (btn) btn.classList.add('on');
+  },
+
+  initTabs(): void {
+    document.querySelectorAll('.tb').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.setTab((btn as HTMLElement).dataset.tab!);
+      });
+    });
+    // Activate first tab by default
+    const first = document.querySelector('.tb') as HTMLElement | null;
+    if (first && first.dataset.tab) this.setTab(first.dataset.tab);
+  },
 };

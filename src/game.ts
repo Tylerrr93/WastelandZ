@@ -101,6 +101,7 @@ export class Game {
 
     if (!skipIntro) {
       UI.preloadImages();
+      UI.initTabs();
       UI.showIntro(() => {
         UI.fullRender(this);
         this.logMsg("Read the Carpentry book to learn building.", "l-imp");
@@ -108,6 +109,7 @@ export class Game {
       });
     } else {
       UI.preloadImages();
+      UI.initTabs();
       UI.fullRender(this);
       this.logMsg("Read the Carpentry book to learn building.", "l-imp");
       this.logMsg("Use the ladder to reach the surface.", "l-imp");
