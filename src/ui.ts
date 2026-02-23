@@ -7,6 +7,7 @@ import { C } from './config';
 import { Interior } from './world';
 import type { Game } from './game';
 import type { WorldTileDef, InteriorTileDef, Zombie } from './types';
+import { getStructureByTile, getAdjacentStructures } from './structures';
 
 interface PrevStats {
   hp: number;
@@ -325,6 +326,7 @@ export const UI = {
     const el = document.getElementById('actList');
     if (!el) return;
     let html = '';
+
     if (g.location === 'interior') {
       const int = g.currentInterior!;
       const adj = Interior.getAdjacentSearchable(int, g.p.x, g.p.y);
@@ -336,14 +338,31 @@ export const UI = {
       const onFloor = (cell.type === 'floor' || cell.type === 'bfloor');
       const onStairs = cellDef.stair;
       const adjIZ = g.getAdjacentInteriorZombies();
+
+      // Combat
       for (const z of adjIZ) {
         const ed = C.enemies[z.type];
         const dir = this._dirLabel(z.x - g.p.x, z.y - g.p.y);
         html += `<button class="btn btn-a btn-fight" onclick="G.attackZombie(${z.x},${z.y},true)">⚔️ ATTACK ${ed.name} (${dir}) — ${z.hp}/${z.maxHp} HP</button>`;
       }
+
+      // Standard actions
       if (adj.length > 0) html += `<button class="btn btn-a" onclick="G.searchInterior()">🔍 SEARCH SURROUNDINGS</button>`;
       if (salv.length > 0) html += `<button class="btn btn-a btn-salv" onclick="G.salvage()">🔨 SALVAGE FURNITURE</button>`;
       if (barr.length > 0 && g.skills.carpentry) html += `<button class="btn btn-a" onclick="G.barricade()">🪵 BARRICADE OPENING</button>`;
+
+      // ── Structure interactions (adjacent interior structures) ──
+      const adjStructures = getAdjacentStructures(g, g.p.x, g.p.y);
+      for (const { def, x, y } of adjStructures) {
+        for (const ia of def.interactions) {
+          const check = ia.canDo?.({ game: g, structureX: x, structureY: y, tileType: def.tileType as any });
+          const disabled = check && !check.ok;
+          const note = disabled ? ` <small>(${check?.reason})</small>` : '';
+          html += `<button class="btn btn-a btn-struct" ${disabled ? 'disabled' : ''}
+            onclick="G.executeStructureAction('${ia.id}',${x},${y})">${ia.icon} ${ia.label}${note}</button>`;
+        }
+      }
+
       if (onFloor) html += this._interiorPlaceButtons(g);
       if (onStairs) {
         const stLabel = cellDef.stair === 'down' ? '▼ GO DOWNSTAIRS' : '▲ GO UPSTAIRS';
@@ -371,7 +390,9 @@ export const UI = {
           html += `<button class="btn btn-a" onclick="G.exitBuilding()">${exitLabel}</button>`;
       }
       html += `<button class="btn btn-s" onclick="G.wait()">⏳ Wait</button>`;
+
     } else {
+      // World
       const tile = g.map[g.p.y][g.p.x], td = C.tiles[tile.type];
       const adjZ = g.getAdjacentZombies();
       for (const z of adjZ) {
@@ -385,12 +406,26 @@ export const UI = {
         const icon = tile.type === 'bunker_hatch' ? '🪜' : '🚪';
         html += `<button class="btn btn-a" onclick="G.enterBuilding()">${icon} ENTER ${name.toUpperCase()}</button>`;
       }
+
+      // ── World structure interactions ──────────────────────────
+      const worldDef = getStructureByTile(tile.type, 'world');
+      if (worldDef) {
+        for (const ia of worldDef.interactions) {
+          const check = ia.canDo?.({ game: g, tileType: tile.type as any });
+          const disabled = check && !check.ok;
+          const note = disabled ? ` <small>(${check?.reason})</small>` : '';
+          html += `<button class="btn btn-a btn-struct" ${disabled ? 'disabled' : ''}
+            onclick="G.executeStructureAction('${ia.id}')">${ia.icon} ${ia.label}${note}</button>`;
+        }
+      }
+
       html += this._worldPlaceButtons(g);
       const gItems = g.getGroundItems();
       if (gItems.length > 0) html += `<button class="btn btn-a btn-ground" onclick="G.setTab('ground')">📋 ${gItems.length} ITEM${gItems.length > 1 ? 'S' : ''} ON GROUND</button>`;
       html += this._restButton(g);
       html += `<button class="btn btn-s" onclick="G.wait()">⏳ Wait</button>`;
     }
+
     el.innerHTML = html;
   },
 
