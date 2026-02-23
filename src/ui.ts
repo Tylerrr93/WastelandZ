@@ -679,26 +679,18 @@ export const UI = {
     if (e) e.classList.remove('on');
   },
 
+  /* ── Tab System ─────────────────────────────────────────── */
+  // Panel IDs are "tab-{name}", buttons use data-tab="{name}" with class .tb
   setTab(tabName: string): void {
-    // Deactivate all tab panels and buttons
-    document.querySelectorAll('.tp').forEach(p => p.classList.remove('on'));
-    document.querySelectorAll('.tb').forEach(b => b.classList.remove('on'));
-    // Activate the requested tab panel
-    const panel = document.getElementById(tabName + 'P');
+    document.querySelectorAll('.tc').forEach(p => (p as HTMLElement).classList.remove('on'));
+    document.querySelectorAll('.tb').forEach(b => (b as HTMLElement).classList.remove('on'));
+    const panel = document.getElementById('tab-' + tabName);
     if (panel) panel.classList.add('on');
-    // Activate the matching tab button
     const btn = document.querySelector(`.tb[data-tab="${tabName}"]`) as HTMLElement | null;
     if (btn) btn.classList.add('on');
   },
 
   initTabs(): void {
-    document.querySelectorAll('.tb').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.setTab((btn as HTMLElement).dataset.tab!);
-      });
-    });
-    // Activate first tab by default
-    const first = document.querySelector('.tb') as HTMLElement | null;
-    if (first && first.dataset.tab) this.setTab(first.dataset.tab);
+    this.setTab('act');
   },
 };
