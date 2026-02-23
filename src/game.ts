@@ -6,6 +6,7 @@
 import { C } from './config';
 import { World, Interior } from './world';
 import { UI } from './ui';
+import { getStructureByTile, getAdjacentStructures } from './structures'; // NEW
 import type {
   WorldCell, Position, PlayerStats, LogEntry, InventoryItem,
   Zombie, EquipSlot, ItemId, SkillId, RecipeId, EnemyId,
@@ -43,6 +44,7 @@ export class Game {
   // ── Internal ────────────────────────────────────────────
   private _lastNight: number;
   _lastCraftKey: RecipeId | null;
+  _workbenchActive: boolean; // NEW — set true when adjacent workbench used
 
   constructor(skipIntro: boolean = false) {
     this.map = World.create();
@@ -59,6 +61,7 @@ export class Game {
     this.zombies = [];
     this._lastNight = -1;
     this._lastCraftKey = null;
+    this._workbenchActive = false;
     this.groundItems = {};
 
     this.location = 'world';
@@ -135,6 +138,8 @@ export class Game {
       this._spawnZombies(n);
       this.logMsg("Night falls... something stirs.", "l-bad");
     }
+    // Reset workbench bonus each tick (single-use per craft action)
+    this._workbenchActive = false;
   }
 
   get day(): number { return Math.floor(this.turn / C.tuning.turnsPerDay) + 1; }
@@ -146,7 +151,7 @@ export class Game {
 
 
   // ═══════════════════════════════════════════════════════
-  //  COMPUTED STATS (player.ts)
+  //  COMPUTED STATS
   // ═══════════════════════════════════════════════════════
 
   get vision(): number {
@@ -156,6 +161,13 @@ export class Game {
       if (d.stat === 'vis') v += d.val!;
     }
     if (this.isNight && this.location === 'world') v = Math.max(1, v - C.tuning.nightVisPen);
+    // Watch tower vision boost (stored in tile meta)
+    if (this.location === 'world') {
+      const tile = this.map[this.p.y][this.p.x];
+      if (tile.meta?.['vision_boost'] && (tile.meta['vision_until'] as number) >= this.turn) {
+        v += tile.meta['vision_boost'] as number;
+      }
+    }
     return v;
   }
 
@@ -206,7 +218,7 @@ export class Game {
 
 
   // ═══════════════════════════════════════════════════════
-  //  SKILLS & REST (player.ts)
+  //  SKILLS & REST
   // ═══════════════════════════════════════════════════════
 
   gainXp(sk: SkillId, amt: number): void {
@@ -258,7 +270,7 @@ export class Game {
 
 
   // ═══════════════════════════════════════════════════════
-  //  MOVEMENT & ACTIONS (actions.ts)
+  //  MOVEMENT & ACTIONS
   // ═══════════════════════════════════════════════════════
 
   move(dx: number, dy: number): void {
@@ -332,7 +344,6 @@ export class Game {
     this.location = 'interior';
     this.p = { x: floor.entryPos.x, y: floor.entryPos.y };
 
-    // Spawn interior zombies (bunker never has zombies)
     this.interiorZombies = [];
     if (!building.cleared && building.buildingType !== 'bunker') {
       let openings = 0;
@@ -463,7 +474,11 @@ export class Game {
     if (targets.length === 0) return this.logMsg("Nothing to salvage nearby.", "l-bad");
     this.stats.stm -= t.salvageCost;
     const target = targets[0];
-    const yields = C.salvageYields[target.cell.type as InteriorTileType];
+
+    // Check if StructureDef overrides salvage yields
+    const structDef = getStructureByTile(target.cell.type, 'interior');
+    const yields = structDef?.salvageYields ?? C.salvageYields[target.cell.type as InteriorTileType];
+
     if (yields) {
       for (const y of yields) {
         const qty = y.qty != null ? y.qty : (y.min! + Math.floor(Math.random() * (y.max! - y.min! + 1)));
@@ -489,14 +504,18 @@ export class Game {
     if (idx === -1) return this.logMsg(`You don't have a ${d.name}.`, "l-bad");
     const tile = this.map[this.p.y][this.p.x], td = C.tiles[tile.type];
     if (!td.placeable) return this.logMsg("Can't place that here.", "l-bad");
-    if (['bedroll','shelter','bunker_hatch'].includes(tile.type))
+    // Block placing on any occupied tile type
+    if (!td.pass || ['bedroll','shelter','bunker_hatch','campfire','watch_tower',
+                       'garden_plot','barricade_wall'].includes(tile.type))
       return this.logMsg("Already a structure here.", "l-bad");
     this.map[this.p.y][this.p.x] = World.tile(d.placeType! as any);
     const item = this.inv[idx];
     item.qty--; if (item.qty <= 0) this.inv.splice(idx, 1);
     const tileDef = C.tiles[d.placeType! as keyof typeof C.tiles];
     this.logMsg(`Placed ${tileDef.name}. ${tileDef.desc}`, "l-imp");
-    this.gainXp('survival', 20);
+    // Award XP from StructureDef if present, else default
+    const structDef = getStructureByTile(d.placeType!, 'world');
+    this.gainXp('survival', structDef?.placeXp ?? 20);
     this.tick(); UI.fullRender(this);
   }
 
@@ -518,7 +537,9 @@ export class Game {
     const item = this.inv[idx];
     item.qty--; if (item.qty <= 0) this.inv.splice(idx, 1);
     this.logMsg(`Placed ${d.name}.`, "l-good");
-    this.gainXp('carpentry', 15);
+    // Award XP from StructureDef if present, else default
+    const structDef = getStructureByTile(d.placeType!, 'interior');
+    this.gainXp('carpentry', structDef?.placeXp ?? 15);
     if (!C.itiles[d.placeType as InteriorTileType].pass) {
       for (const [ddx, ddy] of [[0,-1],[0,1],[-1,0],[1,0]] as [number, number][]) {
         const nx = this.p.x + ddx, ny = this.p.y + ddy;
@@ -530,9 +551,45 @@ export class Game {
     this.tick(); UI.fullRender(this);
   }
 
+  // ── NEW: Structure Interaction Dispatcher ──────────────
+  // Called from UI buttons: G.executeStructureAction('campfire_cook')
+  // Finds the matching StructureDef interaction and runs its handler.
+  executeStructureAction(actionId: string, sx?: number, sy?: number): void {
+    if (!this.alive) return;
+
+    if (this.location === 'world') {
+      const tile = this.map[this.p.y][this.p.x];
+      const def = getStructureByTile(tile.type, 'world');
+      if (!def) return;
+      const interaction = def.interactions.find(i => i.id === actionId);
+      if (!interaction) return;
+      const ctx = { game: this, structureX: this.p.x, structureY: this.p.y, tileType: tile.type as any };
+      const check = interaction.canDo?.(ctx);
+      if (check && !check.ok) { this.logMsg(check.reason ?? "Can't do that.", "l-bad"); return; }
+      interaction.handler(ctx);
+      return;
+    }
+
+    if (this.location === 'interior') {
+      const adjacent = getAdjacentStructures(this, this.p.x, this.p.y);
+      for (const { def, x, y } of adjacent) {
+        const interaction = def.interactions.find(i => i.id === actionId);
+        if (!interaction) continue;
+        if (sx !== undefined && sy !== undefined && (x !== sx || y !== sy)) continue;
+        const cell = this.currentInterior!.map[y][x];
+        const ctx = { game: this, structureX: x, structureY: y, tileType: cell.type as any };
+        const check = interaction.canDo?.(ctx);
+        if (check && !check.ok) { this.logMsg(check.reason ?? "Can't do that.", "l-bad"); return; }
+        interaction.handler(ctx);
+        return;
+      }
+      this.logMsg("Nothing to interact with.", "l-bad");
+    }
+  }
+
 
   // ═══════════════════════════════════════════════════════
-  //  COMBAT (combat.ts)
+  //  COMBAT
   // ═══════════════════════════════════════════════════════
 
   getAdjacentZombies(): Zombie[] {
@@ -657,7 +714,7 @@ export class Game {
 
 
   // ═══════════════════════════════════════════════════════
-  //  INVENTORY (inventory.ts)
+  //  INVENTORY
   // ═══════════════════════════════════════════════════════
 
   addItem(id: ItemId, qty: number = 1): void {
@@ -819,108 +876,124 @@ export class Game {
       if (!this.skills[sk]) return this.logMsg(`Don't know ${C.skills[sk].name}.`, "l-bad");
       if (this.skills[sk]!.lvl < lv) return this.logMsg(`Need ${sk} level ${lv}.`, "l-bad");
     }
-    if (r.tool) {
-      if (!this.equip.tool || this.equip.tool.id !== r.tool)
-        return this.logMsg(`Need ${C.items[r.tool].name} equipped.`, "l-bad");
+    // Check crafting station requirement
+    if (r.requiresStation) {
+      let hasStation = false;
+      if (this.currentInterior) {
+        const int = this.currentInterior;
+        for (const [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0],[0,0]] as [number,number][]) {
+          const nx = this.p.x + dx, ny = this.p.y + dy;
+          if (nx >= 0 && nx < int.w && ny >= 0 && ny < int.h) {
+            if (int.map[ny][nx].type === r.requiresStation) { hasStation = true; break; }
+          }
+        }
+      }
+      if (!hasStation) {
+        const stDef = C.itiles[r.requiresStation];
+        const stName = stDef?.css?.replace('it-','') ?? r.requiresStation;
+        return this.logMsg(`Requires a ${stName} nearby.`, "l-bad");
+      }
     }
-    for (const m in r.inputs) {
-      const mid = m as ItemId;
-      if (this.countItem(mid) < r.inputs[mid]!)
-        return this.logMsg(`Need ${r.inputs[mid]} ${C.items[mid].name}.`, "l-bad");
+    // Check and consume inputs (workbench gives -1 wood discount)
+    for (const [id, qty] of Object.entries(r.inputs) as [ItemId, number][]) {
+      const needed = (id === 'wood' && this._workbenchActive) ? Math.max(0, qty - 1) : qty;
+      if (this.countItem(id) < needed) {
+        return this.logMsg(`Need ${needed}× ${C.items[id].name}.`, "l-bad");
+      }
     }
-    for (const m in r.inputs) this.removeItem(m as ItemId, r.inputs[m as ItemId]!);
-    this.addItem(r.result.id, r.result.count || 1);
-    const ri = C.items[r.result.id];
-    this.logMsg(`Crafted ${ri.icon} ${r.name}.`, "l-good");
+    for (const [id, qty] of Object.entries(r.inputs) as [ItemId, number][]) {
+      const needed = (id === 'wood' && this._workbenchActive) ? Math.max(0, qty - 1) : qty;
+      this.removeItem(id, needed);
+    }
+    if (r.result.type === 'item') {
+      this.addItem(r.result.id, r.result.count ?? 1);
+    }
+    this.logMsg(`Crafted: ${r.name}`, "l-good");
     this._lastCraftKey = key;
-    this._degradeSlot('tool', C.tuning.durTool);
+    if (r.reqSkill) this.gainXp(r.reqSkill[0], 20);
+    this._workbenchActive = false;
     this.tick(); UI.fullRender(this);
   }
 
 
   // ═══════════════════════════════════════════════════════
-  //  HELPERS
+  //  LOGGING
   // ═══════════════════════════════════════════════════════
 
-  setTab(name: string): void {
-    document.querySelectorAll('.tc').forEach(e => e.classList.remove('on'));
-    document.querySelectorAll('.tb').forEach(e => e.classList.remove('on'));
-    document.getElementById('tab-' + name)?.classList.add('on');
-    document.querySelectorAll('.tb').forEach(b => { if ((b as HTMLElement).dataset.tab === name) b.classList.add('on'); });
+  logMsg(m: string, c: string = ''): void {
+    this.log.unshift({ m, c });
+    if (this.log.length > 50) this.log.pop();
+    UI.renderLog(this);
   }
 
-  logMsg(text: string, cls: string = ''): void {
-    this.log.unshift({ m: text, c: cls }); UI.renderLog(this);
-  }
 
-  restart(): void { UI.hideDeath(); (window as any).G = new Game(true); }
+  // ═══════════════════════════════════════════════════════
+  //  PRIVATE HELPERS
+  // ═══════════════════════════════════════════════════════
 
-  reveal(): void {
-    const r = this.vision;
-    const px = this.worldPos ? this.worldPos.x : this.p.x;
-    const py = this.worldPos ? this.worldPos.y : this.p.y;
-    for (let dy = -r; dy <= r; dy++)
-      for (let dx = -r; dx <= r; dx++) {
-        const nx = px + dx, ny = py + dy;
-        if (nx >= 0 && nx < C.w && ny >= 0 && ny < C.h) this.visited.add(`${nx},${ny}`);
-      }
-  }
-
-  private _die(reason: string): void {
-    this.alive = false; this.logMsg(reason, "l-bad"); UI.fullRender(this); UI.showDeath(this);
-  }
-
-  _wPick<T extends string>(pool: WeightedEntry<T>[]): T {
-    let t = pool.reduce((s, e) => s + e.weight, 0), r = Math.random() * t;
-    for (const e of pool) { r -= e.weight; if (r <= 0) return e.id; }
-    return pool[pool.length - 1].id;
-  }
-
-  private _findStart(): Position {
-    const cx = Math.floor(C.w / 2), cy = Math.floor(C.h / 2);
-    for (let r = 0; r < 15; r++)
-      for (let dy = -r; dy <= r; dy++)
-        for (let dx = -r; dx <= r; dx++) {
-          const x = cx + dx, y = cy + dy;
-          if (x < 0 || x >= C.w || y < 0 || y >= C.h) continue;
-          if (C.tiles[this.map[y][x].type].pass) return { x, y };
-        }
-    return { x: cx, y: cy };
-  }
-
-  private _groundKey(): string {
-    if (this.location === 'interior') {
-      const wp = this.worldPos!;
-      return `i:${wp.x},${wp.y}:f${this.currentFloor}:${this.p.x},${this.p.y}`;
+  _groundKey(): string {
+    if (this.location === 'interior' && this.worldPos) {
+      return `i:${this.worldPos.x},${this.worldPos.y}:f${this.currentFloor}:${this.p.x},${this.p.y}`;
     }
     return `w:${this.p.x},${this.p.y}`;
   }
 
-  _degradeSlot(slot: EquipSlot, amt: number): void {
-    const it = this.equip[slot];
-    if (!it || !it.maxHp) return;
-    it.hp! -= amt;
-    if (it.hp! <= 0) {
-      this.logMsg(`${C.items[it.id].icon} ${C.items[it.id].name} broke!`, "l-bad");
+  private _findStart(): Position {
+    for (let a = 0; a < 1000; a++) {
+      const x = Math.floor(Math.random() * C.w), y = Math.floor(Math.random() * C.h);
+      if (C.tiles[this.map[y][x].type].pass) return { x, y };
+    }
+    return { x: Math.floor(C.w / 2), y: Math.floor(C.h / 2) };
+  }
+
+  private _degradeSlot(slot: EquipSlot, amount: number): void {
+    const item = this.equip[slot];
+    if (!item || item.hp === null) return;
+    item.hp = Math.max(0, item.hp - amount);
+    if (item.hp <= 0) {
+      this.logMsg(`${C.items[item.id].icon} ${C.items[item.id].name} broke!`, "l-bad");
       this.equip[slot] = null;
     }
   }
 
+  reveal(): void {
+    if (this.location !== 'world') return;
+    const v = this.vision;
+    for (let dy = -v; dy <= v; dy++)
+      for (let dx = -v; dx <= v; dx++) {
+        const nx = this.p.x + dx, ny = this.p.y + dy;
+        if (nx >= 0 && nx < C.w && ny >= 0 && ny < C.h)
+          this.visited.add(`${nx},${ny}`);
+      }
+  }
+
+  private _die(reason: string): void {
+    this.alive = false;
+    this.logMsg(`☠️ ${reason}`, "l-bad");
+    UI.showDeath(this, reason);
+  }
+
+  _wPick<T extends string>(pool: WeightedEntry<T>[]): T {
+    const total = pool.reduce((s, e) => s + e.weight, 0);
+    let r = Math.random() * total;
+    for (const e of pool) { r -= e.weight; if (r <= 0) return e.id; }
+    return pool[pool.length - 1].id;
+  }
+
+  setTab(tab: string): void {
+    UI.setTab(tab);
+  }
+
   private _initSwipe(): void {
-    let sx: number | null, sy: number | null;
-    const min = 30;
-    const vp = document.getElementById('viewport');
-    if (!vp) return;
-    vp.addEventListener('touchstart', e => {
-      sx = e.touches[0].clientX; sy = e.touches[0].clientY;
-    }, { passive: true });
-    vp.addEventListener('touchend', e => {
-      if (sx == null || sy == null) return;
-      const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
-      if (Math.abs(dx) < min && Math.abs(dy) < min) return;
-      if (Math.abs(dx) > Math.abs(dy)) this.move(dx > 0 ? 1 : -1, 0);
+    let sx = 0, sy = 0;
+    document.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
+    document.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - sx;
+      const dy = e.changedTouches[0].clientY - sy;
+      const adx = Math.abs(dx), ady = Math.abs(dy);
+      if (Math.max(adx, ady) < 30) return;
+      if (adx > ady) this.move(dx > 0 ? 1 : -1, 0);
       else this.move(0, dy > 0 ? 1 : -1);
-      sx = null;
     }, { passive: true });
   }
 }

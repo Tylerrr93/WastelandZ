@@ -8,12 +8,16 @@
 export type WorldTileType =
   | 'grass' | 'forest' | 'water' | 'road' | 'bridge'
   | 'house' | 'store' | 'garage' | 'clinic' | 'warehouse'
-  | 'bunker_hatch' | 'bedroll' | 'shelter' | 'rain_catcher';
+  | 'bunker_hatch' | 'bedroll' | 'shelter' | 'rain_catcher'
+  // ── Extensible: add new placeable world tiles here ──────
+  | 'campfire' | 'watch_tower' | 'garden_plot' | 'barricade_wall';
 
 export type InteriorTileType =
   | 'wall' | 'floor' | 'door' | 'window' | 'shelf' | 'counter'
   | 'locker' | 'ladder' | 'stairs_up' | 'stairs_down'
-  | 'pwall' | 'pdoor' | 'crate' | 'bwall' | 'bfloor';
+  | 'pwall' | 'pdoor' | 'crate' | 'bwall' | 'bfloor'
+  // ── Extensible: add new interior placeable tiles here ───
+  | 'workbench' | 'forge' | 'med_station' | 'barricade_window';
 
 export type BuildingType = 'house' | 'store' | 'garage' | 'clinic' | 'warehouse' | 'bunker';
 
@@ -36,7 +40,11 @@ export type ItemId =
   | 'book_carp'
   | 'scrap' | 'wood' | 'nails' | 'cloth' | 'metal_sheet'
   | 'bedroll_kit' | 'shelter_kit' | 'rain_kit'
-  | 'wall_frame' | 'door_frame' | 'crate_kit' | 'locker_kit';
+  | 'wall_frame' | 'door_frame' | 'crate_kit' | 'locker_kit'
+  // ── Extensible: add new item ids here ───────────────────
+  | 'workbench_kit' | 'forge_kit' | 'med_station_kit'
+  | 'campfire_kit' | 'watch_tower_kit' | 'garden_kit'
+  | 'bwall_kit' | 'rope' | 'charcoal' | 'herbs';
 
 export type EnemyId = 'shambler' | 'runner' | 'brute';
 
@@ -46,7 +54,10 @@ export type RecipeId =
   | 'bandage_c' | 'torch_c' | 'med_kit_c' | 'bedroll_c'
   | 'pipe_c' | 'nail_bat'
   | 'wall_frame' | 'door_frame' | 'shelter_c' | 'crate_c'
-  | 'sheet_c' | 'locker_c' | 'rain_c';
+  | 'sheet_c' | 'locker_c' | 'rain_c'
+  // ── Extensible: add new recipe ids here ─────────────────
+  | 'workbench_c' | 'forge_c' | 'med_station_c'
+  | 'campfire_c' | 'watch_tower_c' | 'garden_c' | 'bwall_c';
 
 export type RecipeCategory = 'survival' | 'combat' | 'building';
 
@@ -100,6 +111,8 @@ export interface InteriorTileDef {
   salvageable?: boolean;
   container?: boolean;
   stair?: 'up' | 'down';
+  /** If set, this tile is a crafting station. Actions in STRUCTURE_DEFS[craftingStation] are available when adjacent. */
+  craftingStation?: StructureId;
 }
 
 // ── Map Cell Data ─────────────────────────────────────────
@@ -109,6 +122,8 @@ export interface WorldCell {
   loot: number;
   max: number;
   interior?: Building;
+  /** Runtime metadata set by structure placement — e.g. hp, fuel, growth stage */
+  meta?: Record<string, number | string>;
 }
 
 export interface InteriorCell {
@@ -116,6 +131,8 @@ export interface InteriorCell {
   loot: number;
   barricadeHp: number;
   storage?: StorageEntry[];
+  /** Runtime metadata set by structure placement — e.g. hp, fuel, growth stage */
+  meta?: Record<string, number | string>;
 }
 
 // ── Items ─────────────────────────────────────────────────
@@ -197,6 +214,8 @@ export interface RecipeDef {
   tool?: ItemId;
   inputs: Partial<Record<ItemId, number>>;
   result: { type: string; id: ItemId; count?: number };
+  /** If set, player must be adjacent to this interior tile type to craft */
+  requiresStation?: InteriorTileType;
 }
 
 // ── Rest ──────────────────────────────────────────────────
@@ -399,4 +418,90 @@ export interface GameConfig {
   player: PlayerStats;
   tuning: TuningConfig;
   worldGen: WorldGenConfig;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  STRUCTURE & ACTION SYSTEM
+//  Add new buildables/interactions without touching game.ts
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * Every unique structure/station/placeable has a StructureId.
+ * To add a new one: add its string here, define it in structures.ts.
+ */
+export type StructureId =
+  // World structures (type:'place' items place these)
+  | 'campfire' | 'watch_tower' | 'garden_plot' | 'barricade_wall'
+  // Interior structures (type:'iplace' items place these)
+  | 'workbench' | 'forge' | 'med_station' | 'barricade_window'
+  // Built-in interior tiles that also act as stations
+  | 'crate' | 'locker' | 'shelf';
+
+/**
+ * ActionId — every contextual action button in the game.
+ * Built-in engine actions use reserved ids; world action ids are arbitrary.
+ * To add a new action: add its id here, define it in structures.ts WORLD_ACTIONS.
+ */
+export type ActionId =
+  // Engine reserved
+  | 'scavenge' | 'search' | 'barricade' | 'salvage'
+  | 'enter' | 'exit' | 'stairs' | 'rest' | 'wait'
+  | 'attack' | 'store' | 'pickup' | 'place'
+  // Structure-driven actions (defined in structures.ts)
+  | 'campfire_cook' | 'campfire_extinguish'
+  | 'garden_water' | 'garden_harvest'
+  | 'watch_tower_climb' | 'workbench_craft' | 'forge_smelt'
+  | 'med_station_treat';
+
+/**
+ * ActionContext — everything an action handler needs.
+ * Passed to WorldActionDef.handler and StructureDef.interactions[].handler.
+ */
+export interface ActionContext {
+  game: import('./game').Game;
+  structureX?: number;
+  structureY?: number;
+  tileType?: WorldTileType | InteriorTileType;
+}
+
+/**
+ * StructureInteraction — one button/action available when adjacent to a structure.
+ * Define these inside StructureDef.interactions[].
+ */
+export interface StructureInteraction {
+  id: ActionId;
+  label: string;
+  icon: string;
+  /** Returns false if the action is currently unavailable (button shown disabled w/ reason) */
+  canDo?: (ctx: ActionContext) => { ok: boolean; reason?: string };
+  handler: (ctx: ActionContext) => void;
+}
+
+/**
+ * StructureDef — full definition of a placeable structure.
+ *
+ * HOW TO ADD A NEW STRUCTURE:
+ *  1. Add its StructureId above
+ *  2. Add a WorldTileType or InteriorTileType for its tile (in types.ts + config.ts)
+ *  3. Add a placeable item (ItemId, ItemDef in config.ts) with placeType set
+ *  4. Add a recipe for that item in config.ts
+ *  5. Add the StructureDef here in structures.ts
+ *  Done — UI and game.ts pick it up automatically.
+ */
+export interface StructureDef {
+  id: StructureId;
+  /** Matches the WorldTileType or InteriorTileType this structure occupies */
+  tileType: WorldTileType | InteriorTileType;
+  /** Whether this is a world-map tile or an interior tile */
+  location: 'world' | 'interior';
+  name: string;
+  icon: string;
+  /** Actions available when player is on (world) or adjacent (interior) to this structure */
+  interactions: StructureInteraction[];
+  /** Materials yielded when dismantled/salvaged (overrides config.ts salvageYields for this type) */
+  salvageYields?: SalvageYield[];
+  /** Max HP for destructible structures; undefined = indestructible */
+  maxHp?: number;
+  /** XP awarded to carpentry on placement */
+  placeXp?: number;
 }

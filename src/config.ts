@@ -16,6 +16,7 @@ export const C: GameConfig = {
 
   /* ── World Tiles ─────────────────────────────────────────── */
   tiles: {
+    // ── All original tiles preserved exactly ────────────────
     grass:        {txt:',', icon:',',  css:'t-grass',      pass:true,  cap:2, name:"Wild Grass",      desc:"Overgrown vegetation.", placeable:true,
                    txtV:[',','.','\`','\'',';','⁖','˙','‥'],
                    iconV:[',','.','\`','\'',';','⁖','˙','∴','‥','⸪']},
@@ -38,10 +39,16 @@ export const C: GameConfig = {
     bedroll:      {txt:'🏕', icon:'🛌', css:'t-bedroll',    pass:true,  cap:0, name:"Bedroll",          desc:"A rough sleeping spot."},
     shelter:      {txt:'⛺', icon:'🏕️', css:'t-shelter',    pass:true,  cap:0, name:"Lean-To",          desc:"A sturdy shelter."},
     rain_catcher: {txt:'⛆', icon:'🪣', css:'t-water',      pass:true,  cap:0, name:"Rain Catcher",     desc:"Collects water slowly."},
+    // ── New extensible world tiles ───────────────────────────
+    campfire:     {txt:'f', icon:'🔥', css:'t-campfire',   pass:true,  cap:0, name:"Campfire",         desc:"Warmth & cooking.", placeable:true},
+    watch_tower:  {txt:'^', icon:'🗼', css:'t-tower',      pass:true,  cap:0, name:"Watch Tower",      desc:"Extended scouting range.", placeable:true},
+    garden_plot:  {txt:'g', icon:'🌱', css:'t-garden',     pass:true,  cap:0, name:"Garden Plot",      desc:"Grow food over time.", placeable:true},
+    barricade_wall:{txt:'X', icon:'🪵', css:'t-bwall',     pass:false, cap:0, name:"Barricade Wall",   desc:"Blocks passage."},
   },
 
   /* ── Interior Tile Types ─────────────────────────────────── */
   itiles: {
+    // ── All original interior tiles preserved exactly ────────
     wall:        {txt:'#', icon:'▓', css:'it-wall',      pass:false},
     floor:       {txt:'.', icon:'·', css:'it-floor',     pass:true},
     door:        {txt:'+', icon:'╬', css:'it-door',      pass:true, entry:true, barricadable:true},
@@ -57,16 +64,27 @@ export const C: GameConfig = {
     crate:       {txt:'X', icon:'📦',css:'it-crate',     pass:false, container:true, salvageable:true},
     bwall:       {txt:'#', icon:'█', css:'it-bwall',     pass:false},
     bfloor:      {txt:'.', icon:'░', css:'it-bfloor',    pass:true},
+    // ── New extensible interior tiles ────────────────────────
+    workbench:        {txt:'W', icon:'🛠️', css:'it-wbench',   pass:false, salvageable:true, craftingStation:'workbench'},
+    forge:            {txt:'F', icon:'⚒️', css:'it-forge',    pass:false, salvageable:true, craftingStation:'forge'},
+    med_station:      {txt:'M', icon:'🏥', css:'it-medst',    pass:false, salvageable:true, craftingStation:'med_station'},
+    barricade_window: {txt:'B', icon:'🪵', css:'it-barrw',    pass:false, salvageable:true},
   },
 
   /* ── Salvage Yields ──────────────────────────────────────── */
   salvageYields: {
+    // ── All original yields preserved exactly ────────────────
     shelf:   [{id:'wood',qty:1},{id:'nails',min:1,max:3}],
     counter: [{id:'scrap',qty:1},{id:'nails',min:0,max:2}],
     locker:  [{id:'scrap',qty:2},{id:'metal_sheet',qty:1}],
     pwall:   [{id:'wood',qty:1},{id:'nails',min:1,max:2}],
     pdoor:   [{id:'wood',qty:1},{id:'nails',qty:1}],
     crate:   [{id:'wood',qty:2},{id:'nails',min:1,max:3},{id:'scrap',qty:1}],
+    // ── New structure yields (also defined in structures.ts — structures.ts wins) ─
+    workbench:        [{id:'wood',min:2,max:4},{id:'scrap',min:1,max:3},{id:'nails',min:2,max:5}],
+    forge:            [{id:'scrap',min:3,max:6},{id:'metal_sheet',min:1,max:2}],
+    med_station:      [{id:'cloth',min:2,max:4},{id:'scrap',min:1,max:2}],
+    barricade_window: [{id:'wood',min:1,max:2},{id:'nails',min:1,max:3}],
   },
 
   /* ── Skills ──────────────────────────────────────────────── */
@@ -78,6 +96,7 @@ export const C: GameConfig = {
 
   /* ── Items ───────────────────────────────────────────────── */
   items: {
+    // ── All original items preserved exactly ─────────────────
     knife:       {name:"Shiv",           type:'weapon',icon:'🔪',stat:'atk',val:3, wgt:0.5,dur:40},
     pipe:        {name:"Lead Pipe",      type:'weapon',icon:'🔧',stat:'atk',val:4, wgt:1.5,dur:50},
     bat:         {name:"Nail Bat",       type:'weapon',icon:'🏏',stat:'atk',val:5, wgt:2.0,dur:60},
@@ -113,6 +132,21 @@ export const C: GameConfig = {
     door_frame:  {name:"Door Frame",     type:'iplace',icon:'🚪',placeType:'pdoor',wgt:1.5},
     crate_kit:   {name:"Storage Crate",  type:'iplace',icon:'📦',placeType:'crate',wgt:3.0},
     locker_kit:  {name:"Steel Locker",   type:'iplace',icon:'🗄️',placeType:'locker',wgt:5.0},
+
+    // ── New placeable items ───────────────────────────────────
+    campfire_kit:    {name:"Campfire Kit",     type:'place', icon:'🔥',placeType:'campfire',   wgt:1.0},
+    watch_tower_kit: {name:"Watch Tower Kit",  type:'place', icon:'🗼',placeType:'watch_tower',wgt:6.0},
+    garden_kit:      {name:"Garden Kit",       type:'place', icon:'🌱',placeType:'garden_plot',wgt:2.0},
+    bwall_kit:       {name:"Barricade Wall",   type:'place', icon:'🪵',placeType:'barricade_wall',wgt:3.0},
+
+    workbench_kit:   {name:"Workbench",        type:'iplace',icon:'🛠️',placeType:'workbench',  wgt:4.0},
+    forge_kit:       {name:"Forge Kit",        type:'iplace',icon:'⚒️',placeType:'forge',      wgt:8.0},
+    med_station_kit: {name:"Medical Station",  type:'iplace',icon:'🏥',placeType:'med_station',wgt:3.0},
+
+    // ── New raw materials ─────────────────────────────────────
+    rope:     {name:"Rope",        type:'mat', icon:'🪢',wgt:0.3,stack:20},
+    charcoal: {name:"Charcoal",    type:'mat', icon:'⬛',wgt:0.2,stack:30},
+    herbs:    {name:"Dried Herbs", type:'mat', icon:'🌿',wgt:0.1,stack:20},
   },
 
   /* ── Enemies ─────────────────────────────────────────────── */
@@ -129,6 +163,7 @@ export const C: GameConfig = {
 
   /* ── Recipes ─────────────────────────────────────────────── */
   recipes: {
+    // ── All original recipes preserved exactly ────────────────
     bandage_c:   {name:"Bandage",      cat:'survival', reqSkill:null,            inputs:{cloth:2},                result:{type:'item',id:'bandage',count:1}},
     torch_c:     {name:"Torch",        cat:'survival', reqSkill:null,            inputs:{wood:1,cloth:2},         result:{type:'item',id:'torch',count:1}},
     med_kit_c:   {name:"First Aid Kit",cat:'survival', reqSkill:null,            inputs:{bandage:2,cloth:1},      result:{type:'item',id:'med_kit',count:1}},
@@ -144,6 +179,15 @@ export const C: GameConfig = {
     sheet_c:     {name:"Metal Sheet",  cat:'building', reqSkill:['carpentry',1], inputs:{scrap:5},                result:{type:'item',id:'metal_sheet',count:1}},
     locker_c:    {name:"Steel Locker", cat:'building', reqSkill:['carpentry',2], inputs:{metal_sheet:3,nails:4},  result:{type:'item',id:'locker_kit',count:1}},
     rain_c:      {name:"Rain Catcher", cat:'building', reqSkill:['carpentry',1], inputs:{wood:2,cloth:2,scrap:1}, result:{type:'item',id:'rain_kit',count:1}},
+
+    // ── New recipes ───────────────────────────────────────────
+    campfire_c:     {name:"Campfire Kit",    cat:'survival', reqSkill:null,            inputs:{wood:3,cloth:1},              result:{type:'item',id:'campfire_kit',count:1}},
+    garden_c:       {name:"Garden Kit",      cat:'survival', reqSkill:null,            inputs:{wood:2,cloth:2,rope:1},       result:{type:'item',id:'garden_kit',count:1}},
+    watch_tower_c:  {name:"Watch Tower",     cat:'building', reqSkill:['carpentry',2], inputs:{wood:8,nails:10,rope:2},      result:{type:'item',id:'watch_tower_kit',count:1}},
+    bwall_c:        {name:"Barricade Wall",  cat:'building', reqSkill:['carpentry',1], inputs:{wood:4,nails:6},              result:{type:'item',id:'bwall_kit',count:1}},
+    workbench_c:    {name:"Workbench",       cat:'building', reqSkill:['carpentry',1], inputs:{wood:4,nails:6,scrap:2},      result:{type:'item',id:'workbench_kit',count:1}},
+    forge_c:        {name:"Forge",           cat:'building', reqSkill:['carpentry',2], inputs:{metal_sheet:4,scrap:6,nails:4},result:{type:'item',id:'forge_kit',count:1}},
+    med_station_c:  {name:"Medical Station", cat:'building', reqSkill:['carpentry',1], inputs:{wood:2,cloth:4,scrap:2},      result:{type:'item',id:'med_station_kit',count:1}},
   },
 
   /* ── Rest Tiers ──────────────────────────────────────────── */
@@ -162,24 +206,25 @@ export const C: GameConfig = {
 
   /* ── Loot Pools ──────────────────────────────────────────── */
   lootPools: {
-    nature:          [{id:'wood',weight:15},{id:'cloth',weight:4},{id:'book_carp',weight:1}],
-    road:            [{id:'scrap',weight:10},{id:'water_b',weight:5},{id:'nails',weight:8},{id:'knife',weight:2}],
+    nature:          [{id:'wood',weight:15},{id:'cloth',weight:4},{id:'book_carp',weight:1},{id:'rope',weight:5},{id:'herbs',weight:6}],
+    road:            [{id:'scrap',weight:10},{id:'water_b',weight:5},{id:'nails',weight:8},{id:'knife',weight:2},{id:'rope',weight:3}],
     house:           [{id:'canned',weight:8},{id:'water_b',weight:8},{id:'bandage',weight:5},{id:'nails',weight:8},{id:'book_carp',weight:2},{id:'knife',weight:3},{id:'cloth',weight:6}],
     store:           [{id:'canned',weight:15},{id:'water_b',weight:12},{id:'bandage',weight:6},{id:'backpack',weight:2},{id:'boots',weight:2},{id:'flashlight',weight:3},{id:'jerky',weight:8}],
-    garage:          [{id:'scrap',weight:15},{id:'nails',weight:12},{id:'wood',weight:8},{id:'pipe',weight:3},{id:'hammer',weight:2},{id:'cloth',weight:4},{id:'metal_sheet',weight:2}],
-    clinic:          [{id:'bandage',weight:15},{id:'med_kit',weight:4},{id:'cloth',weight:8},{id:'water_b',weight:6}],
-    warehouse:       [{id:'wood',weight:12},{id:'nails',weight:12},{id:'scrap',weight:10},{id:'cloth',weight:8},{id:'canned',weight:5},{id:'backpack',weight:2},{id:'metal_sheet',weight:4}],
+    garage:          [{id:'scrap',weight:15},{id:'nails',weight:12},{id:'wood',weight:8},{id:'pipe',weight:3},{id:'hammer',weight:2},{id:'cloth',weight:4},{id:'metal_sheet',weight:2},{id:'charcoal',weight:4}],
+    clinic:          [{id:'bandage',weight:15},{id:'med_kit',weight:4},{id:'cloth',weight:8},{id:'water_b',weight:6},{id:'herbs',weight:6}],
+    warehouse:       [{id:'wood',weight:12},{id:'nails',weight:12},{id:'scrap',weight:10},{id:'cloth',weight:8},{id:'canned',weight:5},{id:'backpack',weight:2},{id:'metal_sheet',weight:4},{id:'rope',weight:6}],
 
     shelf_house:     [{id:'canned',weight:10},{id:'water_b',weight:10},{id:'bandage',weight:8},{id:'cloth',weight:8},{id:'nails',weight:10},{id:'hammer',weight:3},{id:'knife',weight:4},{id:'jacket',weight:2},{id:'book_carp',weight:3}],
     shelf_store:     [{id:'canned',weight:15},{id:'water_b',weight:15},{id:'bandage',weight:10},{id:'jerky',weight:10},{id:'backpack',weight:3},{id:'flashlight',weight:5},{id:'boots',weight:3},{id:'rifle',weight:1}],
-    shelf_garage:    [{id:'scrap',weight:15},{id:'nails',weight:12},{id:'hammer',weight:5},{id:'pipe',weight:4},{id:'wood',weight:8},{id:'flashlight',weight:3},{id:'boots',weight:2},{id:'metal_sheet',weight:3}],
-    shelf_clinic:    [{id:'bandage',weight:15},{id:'med_kit',weight:6},{id:'cloth',weight:10},{id:'water_b',weight:8},{id:'book_carp',weight:2}],
-    shelf_warehouse: [{id:'wood',weight:12},{id:'nails',weight:15},{id:'scrap',weight:12},{id:'cloth',weight:10},{id:'canned',weight:6},{id:'jerky',weight:4},{id:'backpack',weight:3},{id:'boots',weight:2},{id:'metal_sheet',weight:4}],
+    shelf_garage:    [{id:'scrap',weight:15},{id:'nails',weight:12},{id:'hammer',weight:5},{id:'pipe',weight:4},{id:'wood',weight:8},{id:'flashlight',weight:3},{id:'boots',weight:2},{id:'metal_sheet',weight:3},{id:'charcoal',weight:4}],
+    shelf_clinic:    [{id:'bandage',weight:15},{id:'med_kit',weight:6},{id:'cloth',weight:10},{id:'water_b',weight:8},{id:'book_carp',weight:2},{id:'herbs',weight:8}],
+    shelf_warehouse: [{id:'wood',weight:12},{id:'nails',weight:15},{id:'scrap',weight:12},{id:'cloth',weight:10},{id:'canned',weight:6},{id:'jerky',weight:4},{id:'backpack',weight:3},{id:'boots',weight:2},{id:'metal_sheet',weight:4},{id:'rope',weight:5}],
     shelf_bunker:    [{id:'canned',weight:10},{id:'water_b',weight:10},{id:'bandage',weight:8},{id:'cloth',weight:5},{id:'nails',weight:5}],
   },
   tileLoot: {grass:'nature', forest:'nature', road:'road', house:'house', store:'store', garage:'garage', clinic:'clinic', warehouse:'warehouse'},
 
   /* ── Interior Layouts ────────────────────────────────────── */
+  // All original layouts preserved exactly
   layouts: {
     house: [
       ["#######","#S...S#","#.....#","#.....#","#S...S#","#.....#","#W#D#W#"],
